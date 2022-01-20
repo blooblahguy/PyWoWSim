@@ -13,25 +13,28 @@ class HitTableClass():
 	def calc_white_hit(self, damage):
 		self.glance = 24
 		self.miss = 28
-		crit_mult = 1 + (2 * (1 + 0.03) - 1)
+		crit_mult = 1 + (2 * (1 + self.Player.stats['crit_mult']) - 1)
 		self.modifier = [(100 - self.glance_dr) / 100, crit_mult]
 
-		return self._calc_hit(damage)
+		return self._calc_hit(damage, False)
 		
 	def calc_special_hit(self, damage):
 		self.glance = 0
 		self.miss = 9
-		crit_mult = 1 + (2 * (1 + 0.03) - 1) * (1 + 0.1 * self.Player.has_talent("impale"))
+		crit_mult = 1 + (2 * (1 + self.Player.stats['crit_mult']) - 1) * (1 + 0.1 * self.Player.talents["impale"])
 		self.modifier = [0, crit_mult]
 
-		return self._calc_hit(damage)
+		return self._calc_hit(damage, True)
 
-	def _calc_hit(self, damage):
+	def _calc_hit(self, damage, special):
 		if (not self.Player):
 			print("error: player not defined in hitTable")
 			return
 
-		self.miss -= min(self.miss, self.Player.stats['hit_chance'])
+		damage *= self.Player.stats['damage_mult']
+
+		# print(self.miss, self.Player.stats['hit_chance'])
+		self.miss = max(self.miss - self.Player.stats['hit_chance'], 0.0)
 		self.dodge = 6.5 - min(self.Player.stats['expertise'], 6.5)
 		self.crit = self.Player.stats['crit_chance']
 
@@ -42,11 +45,12 @@ class HitTableClass():
 		calc_crit = self.miss + self.dodge + self.glance + self.crit
 
 		# print(roll)
-		# print("miss", calc_miss)
-		# print("dodge", calc_dodge, "(", self.dodge, ")")
-		# print("glance", calc_glance, "(", self.glance, ")")
-		# print("crit", calc_crit, "(", self.crit, ")")
-		# print("remainder", 100 - calc_crit)
+		# if (special):
+		# 	print("miss", calc_miss)
+		# 	print("dodge", calc_dodge, "(", self.dodge, ")")
+		# 	print("glance", calc_glance, "(", self.glance, ")")
+		# 	print("crit", calc_crit, "(", self.crit, ")")
+		# 	print("remainder", 100 - calc_crit)
 
 		# roll
 		if (roll < calc_miss):
@@ -56,10 +60,10 @@ class HitTableClass():
 			# print(0.0, "dodge")
 			return 0.0, "dodge"
 		if (roll < calc_glance):
-			# print(damage * self.modifier[0], "glance")
+			# print(damage, self.modifier[0], "glance")
 			return damage * self.modifier[0], "glance"
 		if (roll < calc_crit):
-			# print(damage * self.modifier[1], "crit")
+			# print(damage, self.modifier[1], "crit")
 			return damage * self.modifier[1], "crit"
 
 		# print(damage, "hit")

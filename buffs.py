@@ -92,32 +92,12 @@ def imp_seal_of_the_crusader(Player, Target, combat_time):
 BuffClass('imp_seal_of_the_crusader', imp_seal_of_the_crusader)
 
 def imp_sanctity_aura(Player, Target, combat_time):
-	Player.buffs['damage_mult'] += 1.02
+	Player.buffs['damage_mult'] = 1.02
 BuffClass('imp_sanctity_aura', imp_sanctity_aura)
 
 def heroic_presense(Player, Target, combat_time):
 	Player.buffs['hit_rating'] += (15.77 * 1)
 BuffClass('heroic_presense', heroic_presense)
-
-
-ench_default = {
-	"enabled": 0,
-	"strength": 0,
-	"agility": 0,
-	"expertise": 0,
-	"hit": 0,
-	"attack_power": 0,
-	"crit_rating": 0,
-	"crit_mult": 0,
-	"haste": 0,
-	"armor_pen": 0,
-	"proc": {
-		"icd": 0,
-		"chance": 0,
-		"duration": 0,
-		"callback": ""
-	},
-}
 
 enchants = {
 	"mongoose": {

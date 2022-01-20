@@ -26,5 +26,20 @@ bloothirst = Ability("bloodthirst", bloodthirst, 30, 6)
 
 #whirlwind
 def whirlwind(Player, Target):
-	return Player.items['mainhand']['min_damage'] + Player.items['offhand']['min_damage'], Player.items['mainhand']['max_damage'] + Player.items['offhand']['max_damage']
+	damage = Player.normalize_swing("mainhand", Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
+	damage += Player.normalize_swing("offhand", Player.items["offhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
+	return damage
 whirlwind = Ability("whirlwind", whirlwind, 30, 8)
+
+#whirlwind
+# def whirlwind_offhand(Player, Target):
+# 	damage = Player.normalize_swing("offhand", Player.items["offhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
+# 	return damage
+# whirlwind_offhand = Ability("whirlwind_offhand", whirlwind_offhand, 30, 8)
+
+#whirlwind
+def execute(Player, Target):
+	damage = 925 + (Player.rage - 15) * 21
+	Player.spend_rage(Player.rage) # zero out rage
+	return damage
+execute = Ability("execute", execute, 15, 0)

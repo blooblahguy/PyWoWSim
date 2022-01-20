@@ -34,9 +34,17 @@ Item('Spiteblade', "offhand", {
 	"agility": 14,
 })
 
+Item('Merciless Gladiator\'s Slicer', "offhand", {
+	"speed": 2.6,
+	"type": "sword",
+	"min_damage": 203,
+	"max_damage": 305,
+	"hit_rating": 10,
+	"crit_rating": 19,
+	"attack_power": 30,
+})
+
 Item('Talon of Azshara', {
-	"is_weapon": True,
-	"is_weapon": True,
 	"slot": "offhand",
 	"type": "sword",
 	"min_damage": 182,
@@ -50,17 +58,17 @@ Item('Talon of Azshara', {
 ############################
 ## Armor
 ############################
-Item('Warbringer Battle-Helm', "helm", {
+Item('Destroyer Battle-Helm', "helm", {
 	"gems": {
 		"meta": True,
-		"yellow": 1,
+		"blue": 1,
 		"bonus": {
-			"hit_rating": 4
+			"strength": 4
 		},
 	},
-	"strength": 45,
-	"hit_rating": 14,
-	"crit_rating": 24,
+	"strength": 47,
+	"hit_rating": 21,
+	"crit_rating": 36,
 })
 
 Item('Pendant of the Perilous', "neck", {
@@ -68,9 +76,8 @@ Item('Pendant of the Perilous', "neck", {
 	"crit_rating": 23,
 })
 
-Item('Warbringer Shoulderplates', "shoulders", {
-	"agility": 22,
-	"strength": 32,
+Item('Destroyer Shoulderblades', "shoulders", {
+	"strength": 36,
 	"gems": {
 		"yellow": 1,
 		"blue": 1,
@@ -78,7 +85,8 @@ Item('Warbringer Shoulderplates', "shoulders", {
 			"strength": 3
 		}
 	},
-	"hit_rating": 13,
+	"hit_rating": 18,
+	"crit_rating": 20,
 })
 
 Item('Vengeance Wrap', "back", {
