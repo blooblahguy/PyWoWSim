@@ -31,13 +31,18 @@ class CharacterClass:
 			"offhand": False,
 		}
 
+		self.last_swing = {
+			"mainhand": 0,
+			"offhand": 0,
+		}
+
 		# naked stats for level 70
 		self.race = "human"
 		self.gcd = 1.5
 
 		self.ability_casts = {}
 		for key in Abilities:
-			self.ability_casts[key] = 0
+			self.ability_casts[key] = -Abilities[key].cooldown
 
 		# add in all static sources of stats
 		self.character_stats = stat_struct.copy() # stats when naked
@@ -56,9 +61,22 @@ class CharacterClass:
 		# quick talents
 		self.talents = {
 			"weapon_mastery": 2,
+			"improved_heroic_strike": 3,
 			"impale": 2,
+			"cruelty": 2,
+			"commanding_presence": 5,
+			"dual_wield_specialization": 5,
+			"improved_berserker_stance": 5,
 		}
 
+		# combat variables
+		self.queue_heroic_strike = False
+		self.last_anger_rage = 0
+		self.last_bloodrage = 0
+		self.blood_rage_total = 0
+		self.blood_rage_active = False
+
+		#gcd
 		self.off_gcd = True
 		self.last_gcd = 10
 
@@ -84,11 +102,6 @@ class CharacterClass:
 		if (not slot):
 			slot = Items[itemName].slot
 		self.items[slot] = False
-
-	# talents
-	def has_talent(self, name):
-		return True
-		# return self.talents[name]
 	
 	###############
 	# calculate stats
@@ -113,7 +126,7 @@ class CharacterClass:
 		# turn final strength into additional AP
 		self.stats_finalize()
 
-		print(self.stats)
+		# print(self.stats)
 
 	def stats_finalize(self):
 		# add gear
@@ -139,9 +152,13 @@ class CharacterClass:
 
 		# lastly add strength to AP
 		self.stats['attack_power'] += self.stats['strength'] * 2
+		self.stats['attack_power'] *= 1 + (.02 * self.talents['improved_berserker_stance'])
 	
 	# tally talent stats and place in storage
 	def calculate_talent_stats(self):
+		Abilities['heroic_strike'].cost -= self.talents['improved_heroic_strike']
+		self.gear_stats['crit_rating'] += (22.08 * self.talents['cruelty'])
+		# print(Abilities)
 		pass
 
 	# tally gear stats and place in storage
@@ -219,9 +236,10 @@ class CharacterClass:
 
 	# check if we're allowed to swing at all
 	def swing_ready(self, weapon, combat_time):
-		if combat_time > self.items[weapon].last_hit + self.items[weapon].stats['speed']:
+		if combat_time > self.last_swing[weapon] + self.items[weapon].stats['speed']:
 			return True
 		return False
+		
 
 	# whenever we swing or cast, lets try to proc stuff
 	def attempt_procs():
@@ -229,6 +247,9 @@ class CharacterClass:
 
 	def normalize_swing(self, weapon, min_dmg, max_dmg, bonus = 0):
 		damage = random.randrange(min_dmg, max_dmg) + bonus
+		if (weapon == "offhand"):
+			damage *= 1 + (.05 * self.talents['dual_wield_specialization']) # talents
+
 		wep_type = 2.4
 		# 1.7 for daggers
 		# 2.4 for other one-handed weapons
@@ -244,7 +265,7 @@ class CharacterClass:
 	# now swing with given weapon
 	def swing(self, weapon, combat_time):
 		if (self.swing_ready(weapon, combat_time)):
-			self.items[weapon].last_hit = combat_time # reset swing timer
+			self.last_swing[weapon] = combat_time # reset swing timer
 
 			# white hit damage
 			damage = self.normalize_swing(weapon, self.items[weapon].stats['min_damage'], self.items[weapon].stats['max_damage'])
@@ -255,6 +276,9 @@ class CharacterClass:
 			# generate some rage
 			self.generate_rage(damage, weapon, hitType == "crit" and True or False)
 
+			# log this automatically
+			self.Sim.log(weapon, damage, hitType)
+
 			# return hit data
 			return damage, hitType
 		
@@ -264,21 +288,26 @@ class CharacterClass:
 		ability = Abilities[name]
 		last_used = self.ability_casts[name]
 
-		return round(float(last_used + ability.cooldown) - combat_time, 2)
+		return round(max(0.0, last_used + ability.cooldown - combat_time), 2)
 	
 	def can_cast(self, name, combat_time):
+		ability = Abilities[name]
+
 		# off gcd?
-		if (self.off_gcd or combat_time >= float(self.last_gcd + self.gcd)):
+		if (not ability.triggersGCD or (self.off_gcd or combat_time >= float(self.last_gcd + self.gcd))):
 			self.off_gcd = True
 
-			ability = Abilities[name]
 			last_used = self.ability_casts[name]
+
+			# is it off cooldown?
+			if (combat_time < float(last_used + ability.cooldown)):
+				# print("on cooldown", name)
+				return False
 
 			# can we afford it?
 			if (ability.cost > self.rage):
-				return False # no
-			# is it off cooldown?
-			if (combat_time < float(last_used + ability.cooldown)):
+				# if (combat_time > 20):
+					# print("can't afford off cooldown", name, combat_time)
 				return False
 			
 			return True
@@ -286,12 +315,12 @@ class CharacterClass:
 		self.off_gcd = False
 		return False
 
-	def cast(self, name, combat_time, triggersGCD = True):
+	def cast(self, name, combat_time):
 		if (self.can_cast(name, combat_time)):
 			ability = Abilities[name]
 
 			# ok we're casting it, set the last GCD to now
-			if (triggersGCD):
+			if (ability.triggersGCD):
 				self.last_gcd = combat_time
 				self.off_gcd = False
 
@@ -303,32 +332,15 @@ class CharacterClass:
 			damage = ability.cast(self, self.Target)
 
 			# now reduce/filter it
-			damage, hitType = self.HitTable.calc_special_hit(damage)
-			log_combat(combat_time, name, "!", damage, hitType)
+			if (damage == 0):
+				hitType = "cast"
+			else:
+				damage, hitType = self.HitTable.calc_special_hit(damage)
+
+			# log this automatically
+			self.Sim.log(name, damage, hitType)
 
 			return damage, hitType
 
 
 		return False, False
-
-
-
-# Player = CharacterClass()
-# Player.equip("Dragonstrike")
-# Player.equip("Spiteblade")
-# Player.equip("Warbringer Battle-Helm")
-# Player.equip("Pendant of the Perilous")
-# Player.equip("Warbringer Shoulderplates")
-# Player.equip("Vengeance Wrap")
-# Player.equip("Bloodsea Brigand's Vest")
-# Player.equip("Bracers of Eradication")
-# Player.equip("Destroyer Gauntlets")
-# Player.equip("Red Belt of Battle")
-# Player.equip("Destroyer Greaves")
-# Player.equip("Warboots of Obliteration")
-# Player.equip("Ring of a Thousand Marks", "ring1")
-# Player.equip("Ring of Lethality", "ring2")
-# Player.equip("Bloodlust Brooch", "trinket1")
-# Player.equip("Empty Mug of Direbrew", "trinket2")
-# Player.equip("Serpentshrine Shuriken", "ranged")
-# Player.calculate_stats()
