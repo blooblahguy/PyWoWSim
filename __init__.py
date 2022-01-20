@@ -1,7 +1,8 @@
 settings = {}
-settings['per_second'] = 0.1
 settings['combat_seconds'] = 300
-settings['execute_range'] = 15
+settings['per_second'] = 0.1
+settings['iterations'] = 1
+settings['execute_range'] = 0
 settings['latency'] = 0
 
 from structs import *

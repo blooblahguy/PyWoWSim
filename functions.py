@@ -13,11 +13,11 @@ def log_combat(*args):
 	# print(args)
 	pass
 
-def log_damage(name, damage, hitType):
-	data = damage_format.copy()
-	data['damage'] = damage
-	data[hitType] = True
-	log[len(log) + 1] = [name, data]
+# def log_damage(name, damage, hitType):
+# 	data = damage_format.copy()
+# 	data['damage'] = damage
+# 	data[hitType] = True
+# 	log[len(log) + 1] = [name, data]
 
 def merge_dmg(dict1, dict2):
 	for key in damage_format:
