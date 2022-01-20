@@ -1,49 +1,104 @@
 from structs import *
 
-# raid buffs
-buffs = {
-	"battle_shout": buff_struct.copy(),
-	"berserkers_rage": buff_struct.copy(),
-	"gift_of_the_wild": buff_struct.copy(),
-	"leader_of_the_pack": buff_struct.copy(),
-	"trueshot_aura": buff_struct.copy(),
-	"improved_hunters_mark": buff_struct.copy(),
-	"expose_weakness": buff_struct.copy(),
-	"blessing_of_kings": buff_struct.copy(),
-	"blessing_of_might": buff_struct.copy(),
-	"windfury_totem": buff_struct.copy(),
-	"strength_of_earth": buff_struct.copy(),
-	"grace_of_air": buff_struct.copy(),
-	"imp_seal_of_the_crusader": buff_struct.copy(),
-	"imp_sanctity_aura": buff_struct.copy(),
-	"blood_frenzy": buff_struct.copy(),
-	"heroic_presense": buff_struct.copy(),
-	"flask_of_relentless_assault": buff_struct.copy(),
-	"roasted_clefthoof": buff_struct.copy(),
-}
+Buffs = {}
+
+class BuffClass():
+	def __init__(self, name, sub_callback = not_implemented):
+		self.name = name
+		self.enabled = True
+		self.sub_callback = sub_callback
+
+		Buffs[name] = self
+
+	def apply(self, Player, Target = False, combat_time = 0):
+		self.sub_callback(Player, Target, combat_time)
+
+# raid Buffs. we count deBuffs as Buffs for simplicity sake
+
+#todo
+# berserker rage
+# trueshot_aura
+# grace_of_air
+# blood_frenzy
 
 # buff functions
-def battle_shout(name, player, target, combat_time):
-	player['attack_power'] += 306
-buffs['battle_shout']['callback'] = battle_shout
 
-def gift_of_the_wild(name, player, target, combat_time):
-	player['agility'] += 14
-	player['strength'] += 14
-buffs['gift_of_the_wild']['callback'] = gift_of_the_wild
+# do this first
+def flask_of_relentless_assault(Player, Target, combat_time):
+	Player.buffs['attack_power'] += 120
+BuffClass('flask_of_relentless_assault', flask_of_relentless_assault)
 
-def blessing_of_kings(name, player, target, combat_time):
-	player['agility'] *= 1.1
-	player['strength'] *= 1.1
-buffs['blessing_of_kings']['callback'] = blessing_of_kings
+def roasted_clefthoof(Player, Target, combat_time):
+	Player.buffs['strength'] += 20
+BuffClass('roasted_clefthoof', roasted_clefthoof)
 
-def blessing_of_might(name, player, target, combat_time):
-	player['attack_power_rating'] += 220
-buffs['blessing_of_might']['callback'] = blessing_of_might
+def strength_scroll(Player, Target, combat_time):
+	Player.buffs['strength'] += 20
+BuffClass('strength_scroll', strength_scroll)
 
-def leader_of_the_pack(name, player, target, combat_time):
-	player['crit_chance'] *= 1.05
-buffs['leader_of_the_pack']['callback'] = leader_of_the_pack
+def agility_scroll(Player, Target, combat_time):
+	Player.buffs['agility'] += 20
+BuffClass('agility_scroll', agility_scroll)
+
+# now apply kings
+def blessing_of_kings(Player, Target, combat_time):
+	Player.buffs['agility'] *= 1.1
+	Player.buffs['strength'] *= 1.1
+BuffClass('blessing_of_kings', blessing_of_kings)
+
+def leader_of_the_pack(Player, Target, combat_time):
+	Player.buffs['crit_rating'] += (22.08 * 5)
+BuffClass('leader_of_the_pack', leader_of_the_pack)
+
+def battle_shout(Player, Target, combat_time):
+	Player.buffs['attack_power'] += 306
+BuffClass('battle_shout', battle_shout)
+
+def gift_of_the_wild(Player, Target, combat_time):
+	Player.buffs['agility'] += 14
+	Player.buffs['strength'] += 14
+BuffClass('gift_of_the_wild', gift_of_the_wild)
+
+def blessing_of_might(Player, Target, combat_time):
+	Player.buffs['attack_power'] += 220
+BuffClass('blessing_of_might', blessing_of_might)
+
+def hunters_mark(Player, Target, combat_time):
+	Player.buffs['attack_power'] += 110
+BuffClass('hunters_mark', hunters_mark)
+
+def curse_of_recklessness(Player, Target, combat_time):
+	Target.debuffs['armor'] -= 800
+BuffClass('curse_of_recklessness', curse_of_recklessness)
+
+def sunder_armor(Player, Target, combat_time):
+	Target.debuffs['armor'] -= 2600
+BuffClass('sunder_armor', sunder_armor)
+
+def fearie_fire(Player, Target, combat_time):
+	Target.debuffs['armor'] -= 610
+BuffClass('fearie_fire', fearie_fire)
+
+def imp_fearie_fire(Player, Target, combat_time):
+	Player.buffs['hit_rating'] += (15.77 * 3)
+BuffClass('imp_fearie_fire', imp_fearie_fire)
+
+def strength_of_earth(Player, Target, combat_time):
+	Player.buffs['strength'] += 86
+BuffClass('strength_of_earth', strength_of_earth)
+
+def imp_seal_of_the_crusader(Player, Target, combat_time):
+	Player.buffs['crit_rating'] += (22.08 * 3)
+BuffClass('imp_seal_of_the_crusader', imp_seal_of_the_crusader)
+
+def imp_sanctity_aura(Player, Target, combat_time):
+	Player.buffs['damage_mult'] += 1.02
+BuffClass('imp_sanctity_aura', imp_sanctity_aura)
+
+def heroic_presense(Player, Target, combat_time):
+	Player.buffs['hit_rating'] += (15.77 * 1)
+BuffClass('heroic_presense', heroic_presense)
+
 
 ench_default = {
 	"enabled": 0,
@@ -65,38 +120,6 @@ ench_default = {
 }
 
 enchants = {
-	"helm": {
-		"hit": 16,
-		"attack_power_rating": 16,
-	},
-	"helm_meta": {
-		"agility": 16,
-		"crit_mult": .03,
-	},
-	"shoulder": {
-		"crit_rating": 14,
-		"attack_power_rating": 20,
-	},
-	"back": {
-		"agility": 12,
-	},
-	"chest": {
-		"agility": 6,
-		"strength": 6,
-	},
-	"wrist": {
-		"strength": 12,
-	},
-	"hands": {
-		"strength": 15,
-	},
-	"legs": {
-		"crit_rating": 12,
-		"attack_power_rating": 50,
-	},
-	"boots": {
-		"agility": 6,
-	},
 	"mongoose": {
 		"proc": {
 			"icd": 60,
@@ -105,9 +128,4 @@ enchants = {
 			"callback": ""
 		},
 	},
-	"adamantite_stone": {
-		"enabled": 1,
-		"oh_damage": 12,
-		"crit_rating": 14,
-	}
 }

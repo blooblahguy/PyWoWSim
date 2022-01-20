@@ -1,4 +1,5 @@
 import random
+from functions import *
 from __init__ import *
 
 # 15.77 Hit Rating = 1% Hit
@@ -31,10 +32,7 @@ class CharacterClass:
 		}
 
 		# naked stats for level 70
-		self.naked = stat_struct.copy()
-		self.naked["strength"] = 145
-		self.naked["agility"] = 96
-		self.isHuman = True
+		self.race = "human"
 		self.gcd = 1.5
 
 		self.ability_casts = {}
@@ -42,87 +40,76 @@ class CharacterClass:
 			self.ability_casts[key] = 0
 
 		# add in all static sources of stats
-		self.base = stat_struct.copy()
-
-		# calculated stats, take naked, base, buffs, and procs to calculate final values
-		self.final_stats = stat_struct.copy()
-
-		# active buffs
-		self.buffs = {}
+		self.character_stats = stat_struct.copy() # stats when naked
+		self.character_stats["strength"] = 145
+		self.character_stats["agility"] = 96
+		self.gear_stats = stat_struct.copy() # stats from gear
+		self.buffs = stat_struct.copy() # tracking active buffs and stats
+		self.procs = {} # tracking procs (active or not) and stats
+		self.stats = stat_struct.copy() # final calculated stats
 
 		# formula stats
 		self.rage = 0
 		self.level = 70
 		self.rage_factor = .0091107836 * (self.level ** 2) + 3.225598133 * (self.level) + 4.2652911
 
-		self.off_gcd = True
-		self.last_gcd = 10
-
-	# equip item to character
-	def equip(self, itemName, slot = False):
-		if (not slot):
-			slot = items[itemName].slot
-		self.items[slot] = items[itemName]
-
-		# add item stats to base
-		for stat in items[itemName].stats:
-			value = items[itemName].stats[stat]
-
-			# add itemstats to character
-			try:
-				self.base[stat] += value
-			except:
-				pass
-
-	# unequip and remove stats
-	def unequip(self, itemName, slot = False):
-		if (not slot):
-			slot = items[itemName].slot
-		self.items[slot] = False
-
-		# remove item stats from base
-		for stat in items[itemName].stats:
-			value = items[itemName].stats[stat]
-
-			# add itemstats to character
-			try:
-				self.base[stat] -= value
-			except:
-				pass
-
-	# talents
-	def has_talent(self, name):
-		return self.talents[name]
-	
-	###############
-	# calculate stats
-	###############
-	def calculate_stats(self):
-		self.final_stats = stat_struct.copy()
-
-		# bring in talents, they may modify everything
+		# quick talents
 		self.talents = {
 			"weapon_mastery": 2,
 			"impale": 2,
 		}
 
-		self.calculate_base_stats()
+		self.off_gcd = True
+		self.last_gcd = 10
+
+	# add buffs to character
+	def apply_buffs(self, combat_time = 0):
+		for name in Buffs:
+			if (Buffs[name].enabled):
+				Buffs[name].apply(self, self.Target, combat_time)
+
+	def calculate_buff_stats(self):
+		for stat in self.buffs:
+			self.stats[stat] += self.buffs[stat]
+
+	# equip item to character
+	def equip(self, itemName, slot = False):
+		if (not slot):
+			slot = Items[itemName].slot
+		self.items[slot] = Items[itemName]
+
+	# unequip and remove stats
+	def unequip(self, itemName, slot = False):
+		if (not slot):
+			slot = Items[itemName].slot
+		self.items[slot] = False
+
+	# talents
+	def has_talent(self, name):
+		return True
+		# return self.talents[name]
+	
+	###############
+	# calculate stats
+	###############
+	def calculate_stats(self):
+		self.stats = stat_struct.copy() # reset calculated stat array
+
+		# naked stats
+		self.stats['strength'] = self.character_stats["strength"]
+		self.stats['strength'] = self.character_stats["agility"]
 
 		# add gear in
 		self.calculate_gear_stats()
 
-		# convert ratings to percentages
-		self.calculate_crit_chance()
-		self.calculate_expertise_chance()
-		self.calculate_haste()
-		self.calculate_hit_chance()
+		# add buffs in
+		self.apply_buffs()
+		self.calculate_buff_stats()
 
-	def calculate_base_stats(self):
-		# add in simple base stats
-		for stat in self.base:
-			self.final_stats[stat] += self.base[stat]
-		
-		# add in buffs
+		# turn final strength into additional AP
+		self.stats_finalize()
+
+		print(self.stats)
 
 	def calculate_crit_chance(self):
 		crit_chance = 0
@@ -130,41 +117,57 @@ class CharacterClass:
 		crit_chance += self.final_stats['agility'] / 33
 		self.final_stats['crit_chance'] = crit_chance
 		self.final_stats['crit_mult'] = 2
-	def calculate_expertise_chance(self):
-		# add expertise if human
-		if (self.isHuman and (self.items['mainhand'].stats["type"] == "sword" or self.items['mainhand'].stats["type"] == "mace")):
-			self.final_stats['expertise_rating'] += (3.9423 * 5)
 
-		# now calculate chance to remove dodge from rating
-		expertise = ((self.final_stats['expertise_rating'] / 3.9423) * 0.25) + self.has_talent("weapon_mastery")
+	def stats_finalize(self):
+		# add gear
+		for stat in self.gear_stats:
+			self.stats[stat] += self.gear_stats[stat]
 
-		# cap this out at 6.5
-		self.final_stats['expertise'] = min(expertise, 6.5)
-	def calculate_haste(self):
-		self.final_stats['haste'] = self.final_stats['haste_rating'] / 15.77
-	def calculate_hit_chance(self):
-		self.final_stats['hit_chance'] = self.final_stats['hit_rating'] / 15.77
+		# add buffs
+		for stat in self.buffs:
+			self.stats[stat] += self.buffs[stat]
+
+		# calculate hit
+		self.stats['hit_chance'] = self.stats['hit_rating'] / 15.77
+
+		# calculate expertise
+		self.stats['expertise'] = ((self.stats['expertise_rating'] / 3.9423) * 0.25) + 2 #self.has_talent("weapon_mastery")
+
+		# calculate crit chance
+		self.stats['crit_chance'] = self.stats['crit_rating'] / 22.08
+		self.stats['crit_chance'] += self.stats['agility'] / 33
+
+		# calculate haste rating
+		self.stats['haste'] = self.stats['haste_rating'] / 15.77
+
+		# lastly add strength to AP
+		self.stats['attack_power'] += self.stats['strength'] * 2
 	
+	# tally gear stats and place in storage
 	def calculate_gear_stats(self):
+		self.gear_stats = stat_struct.copy() # reset gear stats
+
+		# add enchants to gear (those that aren't procs)
+		for key in Enchants:
+			for stat in Enchants[key].stats:
+				self.gear_stats[stat] += Enchants[key].stats[stat]
+
+		# loop through items and tally
 		for slot in self.items:
 			item = self.items[slot]
 			if (item):
 				for stat in item.stats:
 					try:
-						self.final_stats[stat] += item.stats[stat]
+						self.gear_stats[stat] += item.stats[stat]
 					except:
 						pass
 
-	def calculate_buff_stats():
-		pass
+		# add expertise if human
+		if (self.race == "human" and (self.items['mainhand'].stats["type"] == "sword" or self.items['mainhand'].stats["type"] == "mace")):
+			self.gear_stats['expertise_rating'] += (3.9423 * 5)
 
-	def calculate_proc_stats():
+	def calculate_proc_stats(self):
 		pass
-
-	def calculate_ap(self):
-		# self.stats['attack_power'] = 
-		pass
-		# return self.base['attack_power'] + ((self.base['strength'] + self.bonus_stats['strength']) * 10)
 
 	def gain_rage(self, rage):
 		self.rage += rage
@@ -225,13 +228,13 @@ class CharacterClass:
 			# average / random out the weapon damage
 			damage = random.randrange(self.items[weapon].stats['min_damage'], self.items[weapon].stats['max_damage'])
 			# add ap modifer
-			damage = damage + (2.4 * self.final_stats['attack_power'] / 14)
+			damage = damage + (2.4 * self.stats['attack_power'] / 14)
 			# reduce damage if offhand
 			if (weapon == "offhand"):
 				damage /= 2
 			
 			# calculate the swing against the hit table
-			damage, hitType = HitTable.calc_white_hit(damage)
+			damage, hitType = self.HitTable.calc_white_hit(damage)
 
 			# generate some rage
 			self.generate_rage(damage, weapon, hitType == "crit" and True or False)
@@ -279,6 +282,32 @@ class CharacterClass:
 
 			ability = Abilities[name]
 			damage = ability.cast(self, Target)
-			print(name, "!", damage)
+
+			# now reduce/filter it
+			damage, hitType = self.HitTable.calc_special_hit(damage)
+
+			# log_combat(combat_time, name, "!", damage, hitType)
 
 		# return False
+
+
+
+# Player = CharacterClass()
+# Player.equip("Dragonstrike")
+# Player.equip("Spiteblade")
+# Player.equip("Warbringer Battle-Helm")
+# Player.equip("Pendant of the Perilous")
+# Player.equip("Warbringer Shoulderplates")
+# Player.equip("Vengeance Wrap")
+# Player.equip("Bloodsea Brigand's Vest")
+# Player.equip("Bracers of Eradication")
+# Player.equip("Destroyer Gauntlets")
+# Player.equip("Red Belt of Battle")
+# Player.equip("Destroyer Greaves")
+# Player.equip("Warboots of Obliteration")
+# Player.equip("Ring of a Thousand Marks", "ring1")
+# Player.equip("Ring of Lethality", "ring2")
+# Player.equip("Bloodlust Brooch", "trinket1")
+# Player.equip("Empty Mug of Direbrew", "trinket2")
+# Player.equip("Serpentshrine Shuriken", "ranged")
+# Player.calculate_stats()

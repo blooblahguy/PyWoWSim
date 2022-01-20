@@ -1,6 +1,6 @@
 from structs import *
 
-items = {}
+Items = {}
 
 class Item:
 	def __init__(self, name = "unnamed", slot = "", stats = {}):
@@ -13,7 +13,7 @@ class Item:
 			self.stats['is_weapon'] = True
 			self.last_hit = -10
 
-		items[name] = self
+		Items[name] = self
 
 
 ############################

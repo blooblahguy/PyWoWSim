@@ -11,6 +11,9 @@ stat_struct = {
 	"expertise_rating": 0,
 	"armor_pen": 0,
 	"haste_rating": 0,
+	"crit_mult": 0,
+	"damage_mult": 0,
+	"oh_damage": 0,
 }
 
 # for creating new items
@@ -30,12 +33,6 @@ item_struct["proc"] = {
 	"last_proc": 0,
 	"icd": 0,
 	"callback": not_implemented,
-}
-
-# buffs
-buff_struct = {
-	"enabled": 1,
-	"callback": not_implemented
 }
 
 ability_struct = {

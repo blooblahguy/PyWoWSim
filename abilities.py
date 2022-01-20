@@ -21,11 +21,10 @@ class Ability:
 
 #bloodthirst
 def bloodthirst(Player, Target):
-	# double damage = (state.special_stats.attack_power * 0.45 + state.special_stats.bonus_damage) * (100 + 5 * has_onslaught_4_set_) / 100;
-	return (Player.final_stats['attack_power'] * 45) / 100
+	return (Player.stats['attack_power'] * 45) / 100
 bloothirst = Ability("bloodthirst", bloodthirst, 30, 6)
 
 #whirlwind
 def whirlwind(Player, Target):
-	return Player['mainhand']['min_damage'] + Player['offhand']['min_damage'], Player['mainhand']['max_damage'] + Player['offhand']['max_damage']
+	return Player.items['mainhand']['min_damage'] + Player.items['offhand']['min_damage'], Player.items['mainhand']['max_damage'] + Player.items['offhand']['max_damage']
 whirlwind = Ability("whirlwind", whirlwind, 30, 8)

@@ -61,9 +61,14 @@ def combat_loop():
 	# target
 	Target = TargetClass()
 
+	# hit table
+	HitTable = HitTableClass()
+
 	# initialize things inside of this thread
 	Player = CharacterClass()
-	HitTable.player = Player
+	Player.HitTable = HitTable
+	Player.Target = Target
+	HitTable.Player = Player
 	Player.equip("Dragonstrike")
 	Player.equip("Spiteblade")
 	Player.equip("Warbringer Battle-Helm")
@@ -81,7 +86,7 @@ def combat_loop():
 	Player.equip("Bloodlust Brooch", "trinket1")
 	Player.equip("Empty Mug of Direbrew", "trinket2")
 	Player.equip("Serpentshrine Shuriken", "ranged")
-	
+
 	Player.calculate_stats()
 
 	# start loop

@@ -9,6 +9,9 @@ damage_format = {
 	"dodge": False,
 }
 
+def log_combat(*args):
+	print(args)
+
 def log_damage(name, damage, hitType):
 	data = damage_format.copy()
 	data['damage'] = damage

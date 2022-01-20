@@ -6,7 +6,7 @@ class HitTableClass():
 		self.dodge = 6.5 # from the back
 		self.glance = 24 # flat chance for 73
 		self.glance_dr = 25 # flat reduction
-		self.crit = 24 # filler stat
+		self.crit = 0 # filler stat
 		self.modifier = [] # calculate what a diminished or amplified attack should look like
 		self.player = False
 
@@ -21,19 +21,19 @@ class HitTableClass():
 	def calc_special_hit(self, damage):
 		self.glance = 0
 		self.miss = 9
-		crit_mult = 1 + (2 * (1 + 0.03) - 1) * (1 + 0.1 * self.player.hasTalent("impale"))
+		crit_mult = 1 + (2 * (1 + 0.03) - 1) * (1 + 0.1 * self.Player.has_talent("impale"))
 		self.modifier = [0, crit_mult]
 
 		return self._calc_hit(damage)
 
 	def _calc_hit(self, damage):
-		if (not self.player):
+		if (not self.Player):
 			print("error: player not defined in hitTable")
 			return
 
-		self.miss -= max(self.player.final_stats['hit_chance'], 0.0)
-		self.dodge = 6.5 - self.player.final_stats['expertise']
-		self.crit = self.player.final_stats['crit_chance']
+		self.miss -= min(self.miss, self.Player.stats['hit_chance'])
+		self.dodge = 6.5 - min(self.Player.stats['expertise'], 6.5)
+		self.crit = self.Player.stats['crit_chance']
 
 		roll = random.randrange(0, 100)
 		calc_miss = self.miss
@@ -64,5 +64,3 @@ class HitTableClass():
 
 		# print(damage, "hit")
 		return damage, "hit"
-
-HitTable = HitTableClass()
