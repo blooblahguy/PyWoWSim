@@ -1,4 +1,5 @@
 from structs import *
+import random
 
 Abilities = {}
 
@@ -39,9 +40,16 @@ bloothirst = Ability("bloodthirst", bloodthirst, 30, 6)
 
 #whirlwind
 def whirlwind(Player, Target):
-	damage = Player.normalize_swing("mainhand", Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
-	damage += Player.normalize_swing("offhand", Player.items["offhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
-	return damage
+	mh_damage = random.randrange(Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
+	oh_damage = (random.randrange(Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage']) + Player.stats['oh_damage'])
+
+	oh_damage *= 1 + 0.05 * Player.talents['dual_wield_specialization'] # add talent damage
+	oh_damage /= 2 # offhand penalty
+
+	mh_damage = mh_damage + (Player.stats['attack_power'] * (Player.items["mainhand"].stats['speed'] / 14))
+	oh_damage = oh_damage + (Player.stats['attack_power'] * (Player.items["offhand"].stats['speed'] / 14))
+
+	return mh_damage + oh_damage
 whirlwind = Ability("whirlwind", whirlwind, 30, 9)
 
 #whirlwind

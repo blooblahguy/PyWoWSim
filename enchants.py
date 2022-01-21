@@ -13,18 +13,18 @@ class EnchantClass():
 # glyph
 EnchantClass('helm', {
 	"hit_rating": 16,
-	"attack_power": 16,
+	"attack_power": 34,
 })
 
 # meta
 EnchantClass('helm_meta', {
-	"agility": 16,
+	"agility": 12,
 	"crit_mult": .03,
 })
 
 EnchantClass('shoulder', {
 	"crit_rating": 14,
-	"attack_power": 20,
+	"attack_power": 30,
 })
 
 EnchantClass('back', {

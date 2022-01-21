@@ -45,8 +45,11 @@ class CharacterClass:
 			self.ability_casts[key] = -Abilities[key].cooldown
 
 		# add in all static sources of stats
+		self.strength_mult = 1 # kings base
+		self.agility_mult = 1 # kings base
 		self.character_stats = stat_struct.copy() # stats when naked
 		self.character_stats["strength"] = 145
+		self.character_stats["attack_power"] = 190
 		self.character_stats["agility"] = 96
 		self.gear_stats = stat_struct.copy() # stats from gear
 		self.buffs = stat_struct.copy() # tracking active buffs and stats
@@ -82,14 +85,12 @@ class CharacterClass:
 
 	# add buffs to character
 	def apply_buffs(self, combat_time = 0):
+		# apply the buff callbacks
 		self.buffs = stat_struct.copy()
 		for name in Buffs:
 			if (Buffs[name].enabled):
+				# print(name)
 				Buffs[name].apply(self, self.Target, combat_time)
-
-	def calculate_buff_stats(self):
-		for stat in self.buffs:
-			self.stats[stat] += self.buffs[stat]
 
 	# equip item to character
 	def equip(self, itemName, slot = False):
@@ -111,22 +112,22 @@ class CharacterClass:
 
 		# naked stats
 		self.stats['strength'] = self.character_stats["strength"]
-		self.stats['strength'] = self.character_stats["agility"]
+		self.stats['agility'] = self.character_stats["agility"]
+		self.stats['attack_power'] = self.character_stats["attack_power"]
 
 		# add gear in
 		self.calculate_gear_stats()
 
+		# add buffs in
+		self.apply_buffs()
+
 		# add talents in
 		self.calculate_talent_stats()
 
-		# add buffs in
-		self.apply_buffs()
-		self.calculate_buff_stats()
-
 		# turn final strength into additional AP
-		self.stats_finalize()
+		self.stats_finalize()	
 
-		# print(self.stats)
+		print(self.stats)
 
 	def stats_finalize(self):
 		# add gear
@@ -134,8 +135,12 @@ class CharacterClass:
 			self.stats[stat] += self.gear_stats[stat]
 
 		# add buffs
-		# for stat in self.buffs:
-		# 	self.stats[stat] += self.buffs[stat]
+		# print(self.buffs[stat])
+		for stat in self.buffs:
+			try:
+				self.stats[stat] += self.buffs[stat]
+			except:
+				pass
 
 		# calculate hit
 		self.stats['hit_chance'] = self.stats['hit_rating'] / 15.77
@@ -144,11 +149,16 @@ class CharacterClass:
 		self.stats['expertise'] = ((self.stats['expertise_rating'] / 3.9423) * 0.25) + self.talents["weapon_mastery"]
 
 		# calculate crit chance
+		self.stats['crit_rating'] += (22.08 * 3) # berserker stance
 		self.stats['crit_chance'] = self.stats['crit_rating'] / 22.08
 		self.stats['crit_chance'] += self.stats['agility'] / 33
 
 		# calculate haste rating
 		self.stats['haste'] = self.stats['haste_rating'] / 15.77
+
+		# apply kings
+		self.stats['strength'] *= self.strength_mult
+		self.stats['agility'] *= self.agility_mult
 
 		# lastly add strength to AP
 		self.stats['attack_power'] += self.stats['strength'] * 2
@@ -156,10 +166,8 @@ class CharacterClass:
 	
 	# tally talent stats and place in storage
 	def calculate_talent_stats(self):
-		Abilities['heroic_strike'].cost -= self.talents['improved_heroic_strike']
+		Abilities['heroic_strike'].cost = 15 - self.talents['improved_heroic_strike']
 		self.gear_stats['crit_rating'] += (22.08 * self.talents['cruelty'])
-		# print(Abilities)
-		pass
 
 	# tally gear stats and place in storage
 	def calculate_gear_stats(self):
@@ -190,7 +198,7 @@ class CharacterClass:
 	def gain_rage(self, rage):
 		self.rage += rage
 		if (self.rage > 100):
-			self.Sim.overcapped_rage += self.rage - 100
+			self.Sim.overcapped_rage = self.Sim.overcapped_rage + self.rage - 100
 		self.rage = min(self.rage, 100)
 		# print("gain rage", rage)
 
@@ -245,19 +253,19 @@ class CharacterClass:
 	def attempt_procs():
 		pass
 
-	def normalize_swing(self, weapon, min_dmg, max_dmg, bonus = 0):
+	def normalize_swing(self, weapon, min_dmg, max_dmg, bonus = 0, wep_speed = 2.4):
 		damage = random.randrange(min_dmg, max_dmg) + bonus
-		if (weapon == "offhand"):
-			damage *= 1 + (.05 * self.talents['dual_wield_specialization']) # talents
 
-		wep_type = 2.4
+		wep_speed = 2.4 # normalized for 1h non-daggers
 		# 1.7 for daggers
 		# 2.4 for other one-handed weapons
 		# 3.3 for two-handed weapons
 		# 2.8 for ranged weapons
 
-		damage += (wep_type * self.stats['attack_power'] / 14)
+		damage += (self.stats['attack_power']) / 14 * wep_speed
+
 		if (weapon == "offhand"):
+			damage *= 1 + (.05 * self.talents['dual_wield_specialization']) # talents
 			damage /= 2
 
 		return damage

@@ -1,13 +1,14 @@
+from structs import *
 # store results in here
 results = {}
 log = {}
 
-damage_format = {
-	"damage": 0,
-	"crit": False,
-	"miss": False,
-	"dodge": False,
-}
+# damage_format = {
+# 	"damage": 0,
+# 	"crit": False,
+# 	"miss": False,
+# 	"dodge": False,
+# }
 
 def log_combat(*args):
 	# print(args)
@@ -20,6 +21,7 @@ def log_combat(*args):
 # 	log[len(log) + 1] = [name, data]
 
 def merge_dmg(dict1, dict2):
-	for key in damage_format:
+	# print(dict1, dict2)
+	for key in dict2:
 		dict1[key] += dict2[key]
 	return dict1

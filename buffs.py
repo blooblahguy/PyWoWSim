@@ -42,8 +42,8 @@ BuffClass('agility_scroll', agility_scroll)
 
 # now apply kings
 def blessing_of_kings(Player, Target, combat_time):
-	Player.buffs['agility'] *= 1.1
-	Player.buffs['strength'] *= 1.1
+	Player.agility_mult = 1.1
+	Player.strength_mult = 1.1
 BuffClass('blessing_of_kings', blessing_of_kings)
 
 def leader_of_the_pack(Player, Target, combat_time):
@@ -83,9 +83,9 @@ def imp_fearie_fire(Player, Target, combat_time):
 	Player.buffs['hit_rating'] += (15.77 * 3)
 BuffClass('imp_fearie_fire', imp_fearie_fire)
 
-def strength_of_earth(Player, Target, combat_time):
-	Player.buffs['strength'] += 86
-BuffClass('strength_of_earth', strength_of_earth)
+# def strength_of_earth(Player, Target, combat_time):
+# 	Player.buffs['strength'] += 86
+# BuffClass('strength_of_earth', strength_of_earth)
 
 def imp_seal_of_the_crusader(Player, Target, combat_time):
 	Player.buffs['crit_rating'] += (22.08 * 3)

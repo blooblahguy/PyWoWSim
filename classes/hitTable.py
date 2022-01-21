@@ -8,7 +8,8 @@ class HitTableClass():
 		self.glance_dr = 25 # flat reduction
 		self.crit = 0 # filler stat
 		self.modifier = [] # calculate what a diminished or amplified attack should look like
-		self.player = False
+		self.Player = False
+		self.Target = False
 
 	def calc_white_hit(self, damage):
 		self.glance = 24
@@ -51,6 +52,11 @@ class HitTableClass():
 		# 	print("glance", calc_glance, "(", self.glance, ")")
 		# 	print("crit", calc_crit, "(", self.crit, ")")
 		# 	print("remainder", 100 - calc_crit)
+
+		# reduce from armor now
+		reduce = 1 - (self.Target.armor / (self.Target.armor - 22167.5 + 467.5 * 70))
+		damage *= reduce
+		# print(reduce)
 
 		# roll
 		if (roll < calc_miss):

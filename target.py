@@ -6,3 +6,10 @@ class TargetClass:
 		self.debuffs = {}
 		self.debuffs['armor'] = 0
 		self.final_armor = self.armor
+
+		self.reduce_armor()
+
+	def reduce_armor(self):
+		self.armor -= 610 # faerie fire
+		self.armor -= 800 # curse of recklessness
+		self.armor -= 3075 # expose weakness

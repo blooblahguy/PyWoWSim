@@ -1,7 +1,10 @@
 import time
 import threading
 from __init__ import *
+# from structs import *
 # from tkinter import *
+
+ability_list = ["mainhand", "offhand"]
 
 Sims = {}
 class SimClass():
@@ -14,18 +17,28 @@ class SimClass():
 		self.combat_time = 0
 		self.overcapped_rage = 0
 		self.damage_log = {}
+		self.mins = {}
+		self.maxes = {}
 		Sims[name] = self
 
+		for ability in Abilities:
+			ability_list.append(ability)
+
+		for ability in ability_list:
+			self.mins[ability] = 10000
+			self.maxes[ability] = 0
+
 	def log(self, name, damage, hitType):
-		# damage = hitinfo[0][0] # there's gotta be a better way?
-		# hitType = hitinfo[0][1] # there's gotta be a better way?
-		if (damage == False):
-			return
-		
+		damage = damage != False and damage or 0
+
 		data = damage_format.copy()
 		data['damage'] = damage
-		data[hitType] = True
+		data['casts'] += 1
 		self.total_dmg += damage
+		self.total_dmg += damage
+
+		self.mins[name] = min(self.mins[name], damage)
+		self.maxes[name] = max(self.maxes[name], damage)
 
 		# place in the log
 		self.damage_log[len(self.damage_log) + 1] = [name, data]
@@ -36,15 +49,11 @@ class SimClass():
 			"abilities": {
 				"mainhand": damage_format.copy(),
 				"offhand": damage_format.copy(),
-				"heroic_strike": damage_format.copy(),
-				"cleave": damage_format.copy(),
-				"bloodthirst": damage_format.copy(),
-				"whirlwind": damage_format.copy(),
-				"execute": damage_format.copy(),
-				"sweeping_strikes": damage_format.copy(),
-				"deep_wound": damage_format.copy(),
 			},
 		}
+
+		for ability in Abilities:
+			damage['abilities'][ability] = damage_format.copy()
 
 		# loop through combat log
 		for key in self.damage_log:
@@ -54,6 +63,8 @@ class SimClass():
 			damage['totals']['miss'] += data['miss']
 			damage['totals']['crit'] += data['crit']
 			damage['totals']['dodge'] += data['dodge']
+
+			# print(damage['abilities'], data)
 
 			damage['abilities'][name] = merge_dmg(damage['abilities'][name], data)
 
@@ -65,6 +76,8 @@ def combat_loop():
 
 	# target
 	Target = TargetClass()
+	Target.armor = 8800 # void reaver
+	Target.reduce_armor()
 
 	# hit table
 	HitTable = HitTableClass()
@@ -75,6 +88,7 @@ def combat_loop():
 	Player.Target = Target
 	Player.Sim = Sim
 	HitTable.Player = Player
+	HitTable.Target = Target
 	Player.equip("Dragonstrike")
 	Player.equip("Merciless Gladiator's Slicer")
 	Player.equip("Destroyer Battle-Helm")
@@ -91,7 +105,7 @@ def combat_loop():
 	Player.equip("Ring of Lethality", "ring2")
 	Player.equip("Bloodlust Brooch", "trinket1")
 	Player.equip("Empty Mug of Direbrew", "trinket2")
-	Player.equip("Serpentshrine Shuriken", "ranged")
+	Player.equip("Sunfury Bow of the Phoenix", "ranged")
 
 	Player.calculate_stats()
 
@@ -203,10 +217,24 @@ for name in Sims:
 	# print(name, ":", "--- %s seconds ---" % round(time.time() - Sim.start_time, 3))
 
 	damage = Sim.calculate_totals()
+	print(damage)
 	dps = damage['totals']['damage'] / settings['combat_seconds']
 
 	averages["dps"] += dps
 	averages["overcapped_rage"] += Sim.overcapped_rage
+
+	# total abilities
+	for ability in ability_list:
+		
+		averages[ability] = {}
+		try:
+			averages[ability]['damage'] = damage['abilities'][ability]['damage']
+		except:
+			pass
+		# averages[ability]['damage'] += damage['abilities'][ability]['damage']
+		averages[ability]['min'] = Sim.mins[ability]
+		averages[ability]['max'] = Sim.maxes[ability]
+		averages[ability]['casts'] = damage['abilities'][ability]['casts']
 
 	# print(Sim.combat_time)
 	# print(round(Sim.overcapped_rage), "rage overcapped")
@@ -214,9 +242,21 @@ for name in Sims:
 	# print("")
 
 print("sim finals:", "--- %s seconds ---" % round(time.time() - sim_start, 3))
-print("Averages")
 print("DPS:", round(averages["dps"] / settings['iterations'], 1))
-print("Overcap:", round(averages["overcapped_rage"] / settings['iterations']))
+print("Rage Overcap:", round(averages["overcapped_rage"] / settings['iterations']))
+for ability in ability_list:
+	casts = averages[ability]['casts'] / settings['iterations']
+	damage = round(averages[ability]['damage']) / settings['iterations']
+	min = averages[ability]['max'] > 0 and round(averages[ability]['min']) / settings['iterations'] or 0
+	max = averages[ability]['max'] > 0 and round(averages[ability]['max']) / settings['iterations'] or 0
+
+	if (casts > 0):
+		print(ability,": ", "Damage:", damage, "Casts: ", casts, "Min:", min, "Max:", max)
+
+	# if (averages[ability]['max'] > 0):
+	# 	print(ability, ": Damage", round(averages[ability]['damage']),": Min", round(averages[ability]['min']) / settings['iterations'], "- Max", round(averages[ability]['max']) / settings['iterations'])
+	# averages[ability]['min'] = Sim.mins[ability]
+	# averages[ability]['max'] = Sim.maxes[ability]
 
 # for res in results:
 # 	print(res, results[res])

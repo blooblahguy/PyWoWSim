@@ -54,4 +54,5 @@ damage_format = {
 	"crit": False,
 	"miss": False,
 	"dodge": False,
+	"casts": 0,
 }

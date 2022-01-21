@@ -1,5 +1,5 @@
 settings = {}
-settings['combat_seconds'] = 300
+settings['combat_seconds'] = 165
 settings['per_second'] = 0.1
 settings['iterations'] = 1
 settings['execute_range'] = 0

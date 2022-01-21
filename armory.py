@@ -13,7 +13,45 @@ class Item:
 			self.stats['is_weapon'] = True
 			self.last_hit = -10
 
+		self.apply_gems()
+
 		Items[name] = self
+	def apply_gems(self):
+		use_gems = {
+			"yellow": {
+				"crit_rating": 8,
+			},
+			"blue": {
+				"crit_rating": 4,
+			},
+			"red": {
+				"crit_rating": 4,
+				"strength": 4,
+			},
+		}
+
+		for color in use_gems:
+			# add gems by color
+			try:
+				if (self.stats["gems"][color] > 0):
+					# print("add", color, self.stats["gems"][color])
+					for i in range(1, self.stats["gems"][color] + 1):
+						for stat in use_gems[color]:
+							self.stats[stat] += use_gems[color][stat]
+			except:
+				pass
+		
+		try:
+			for stat in self.stats["gems"]['bonus']:
+				value = self.stats["gems"]['bonus'][stat]
+				if (value > 0):
+					self.stats[stat] += value
+					# print(stat, value)
+		except:
+			pass
+			# if (self.stats["gems"][color] != 0):
+			# 	print(self.stats["gems"][color])
+			# 	# self.stats[]
 
 
 ############################
@@ -93,7 +131,7 @@ Item('Vengeance Wrap', "back", {
 	"gems": {
 		"red": 1,
 		"bonus": {
-			"hit_rating": 3
+			"hit_rating": 2
 		}
 	},
 	"crit_rating": 23,
@@ -105,7 +143,9 @@ Item("Bloodsea Brigand's Vest", "chest", {
 		"yellow": 2,
 		"blue": 1,
 		"bonus": {
-			"attack_power": 8
+			"attack_power": 8,
+			"strength": 5, # we used a strength gem
+			"crit_rating": -4, # which means we should force out our basic 4 crit 4 stam gem
 		}
 	},
 	"crit_rating": 36,
@@ -116,9 +156,9 @@ Item("Bloodsea Brigand's Vest", "chest", {
 Item("Bracers of Eradication", "bracers", {
 	"gems": {
 		"blue": 1,
-		"bonus": {
-			"strength": 2
-		}
+		# "bonus": {
+		# 	"strength": 2
+		# }
 	},
 	"strength": 25,
 	"crit_rating": 24,
@@ -134,9 +174,9 @@ Item("Red Belt of Battle", "belt", {
 	"gems": {
 		"yellow": 1,
 		"blue": 1,
-		"bonus": {
-			"crit_rating": 3
-		}
+		# "bonus": {
+		# 	"crit_rating": 3
+		# }
 	},
 	"strength": 41,
 	"crit_rating": 24,
@@ -156,7 +196,7 @@ Item("Destroyer Greaves", "legs", {
 })
 
 Item("Warboots of Obliteration", "boots", {
-	"strength": 4,
+	"strength": 44,
 	"crit_rating": 31,
 })
 
@@ -178,6 +218,11 @@ Item("Bloodlust Brooch", "trinket", {
 
 Item("Empty Mug of Direbrew", "trinket", {
 	"attack_power": 72,
+})
+
+Item("Sunfury Bow of the Phoenix", "ranged", {
+	"agility": 19,
+	"attack_power": 34,
 })
 
 Item("Serpentshrine Shuriken", "ranged", {
