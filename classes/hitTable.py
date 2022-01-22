@@ -16,6 +16,7 @@ class HitTableClass():
 		self.miss = 28
 		crit_mult = 1 + (2 * (1 + self.Player.stats['crit_mult']) - 1)
 		self.modifier = [(100 - self.glance_dr) / 100, crit_mult]
+		# print("white", crit_mult)
 
 		return self._calc_hit(damage, False)
 		
@@ -24,6 +25,7 @@ class HitTableClass():
 		self.miss = 9
 		crit_mult = 1 + (2 * (1 + self.Player.stats['crit_mult']) - 1) * (1 + 0.1 * self.Player.talents["impale"])
 		self.modifier = [0, crit_mult]
+		# print("sepcial", crit_mult)
 
 		return self._calc_hit(damage, True)
 

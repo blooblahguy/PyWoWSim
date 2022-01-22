@@ -20,6 +20,7 @@ class SimClass():
 		self.damage_log = {}
 		self.mins = {}
 		self.maxes = {}
+		self.last_wf = 0
 		self.Abilities = create_abilities()
 		Sims[name] = self
 
@@ -156,7 +157,10 @@ def combat_loop():
 		# lets pop cooldowns first
 		# deathwish
 		Player.cast("death_wish", combat_time)
-		
+		Player.cast("bloodlust_brooch", combat_time)
+		if (not Sim.Abilities['bloodlust_brooch'].active):
+			Player.cast("empty_diremug", combat_time)
+
 		# trinkets
 		# Player.cast("Bloodlust Brooch", combat_time)
 
@@ -170,6 +174,15 @@ def combat_loop():
 			else:
 				# if not, then swing mainhand
 				Player.swing("mainhand", combat_time)
+
+			# try to proc windfury (yes even off of heroic strike)
+			if (combat_time > Sim.last_wf + 3):
+				Sim.last_wf = combat_time
+				roll = random.randrange(0, 100)
+				if (roll > 20):
+					Player.stats['attack_power'] += 445
+					Player.swing("mainhand", combat_time, True)
+					Player.stats['attack_power'] -= 445
 
 		# auto attack offhand
 		Player.swing("offhand", combat_time)
@@ -277,6 +290,13 @@ for ability in ability_list:
 
 	if (casts > 0):
 		print(ability,": ", "Damage:", damage, "Casts: ", casts, "Min:", min, "Max:", max, "Unused:", unused_off_cooldown)
+
+
+	# buff uptimes?
+
+	# dodges/misses?
+
+	# item upgrades?
 
 # for res in results:
 # 	print(res, results[res])

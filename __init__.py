@@ -19,4 +19,3 @@ from abilities import *
 from character import *
 from target import *
 from functions import *
-from talents import *

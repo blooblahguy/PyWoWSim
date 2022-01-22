@@ -67,7 +67,7 @@ class CharacterClass:
 			"weapon_mastery": 2,
 			"improved_heroic_strike": 3,
 			"impale": 2,
-			"cruelty": 2,
+			"cruelty": 5,
 			"commanding_presence": 5,
 			"dual_wield_specialization": 5,
 			"improved_berserker_stance": 5,
@@ -166,11 +166,11 @@ class CharacterClass:
 		self.stats['strength'] *= self.strength_mult
 		self.stats['agility'] *= self.agility_mult
 
-		# unleashed rage?
-		# self.stats['attack_power'] *= 1.1
-
 		# lastly add strength to AP
 		self.stats['attack_power'] += self.stats['strength'] * 2
+
+		# unleashed rage?
+		self.stats['attack_power'] *= 1.1
 
 		# imp berserker stance
 		self.stats['attack_power'] *= 1 + (.02 * self.talents['improved_berserker_stance'])
@@ -209,9 +209,8 @@ class CharacterClass:
 	def gain_rage(self, rage):
 		self.rage += rage
 		if (self.rage > 100):
-			self.Sim.overcapped_rage = self.Sim.overcapped_rage + self.rage - 100
+			self.Sim.overcapped_rage += self.rage - 100
 		self.rage = min(self.rage, 100)
-		# print("gain rage", rage)
 
 	def spend_rage(self, rage):
 		self.rage -= rage
@@ -220,28 +219,26 @@ class CharacterClass:
 	
 	# generate rage from auto attack
 	def generate_rage(self, damage, weapon, crit = False):
+		if (damage == 0): return
+
 		# weapon rage factor from mh/oh crit/nocrit
 		wep_factor = 0
 		if (weapon == "mainhand"):
-			wep_factor = 3.5
-			if (crit):
-				wep_factor = 7
+			wep_factor = crit and 7 or 3.5
 		elif (weapon == "offhand"):
-			wep_factor = 1.75
-			if (crit):
-				wep_factor = 3.50
+			wep_factor = crit and 3.5 or 1.75
 
 		# normalized weapon speed
-		wep_speed = 2.4
-		# if (self.items[weapon]["type"] == "1h"):
-		# 	wep_speed = 2.4
-		# elif (self.items[weapon]["type"] == "2h"):
-		# 	wep_speed = 3.3
-		# elif (self.items[weapon]["type"] == "dagger"):
-		# 	wep_speed = 1.7
+		wep_speed_normal = 0
+		if (self.items[weapon].stats["type"] == "1h"):
+			wep_speed_normal = 2.4
+		elif (self.items[weapon].stats["type"] == "2h"):
+			wep_speed_normal = 3.3
+		elif (self.items[weapon].stats["type"] == "dagger"):
+			wep_speed_normal = 1.7
 		
 		# final rage formula
-		rage = (((damage / self.rage_factor) * 7.5) + (wep_speed * wep_factor)) / 2
+		rage = (((damage / self.rage_factor) * 7.5) + (wep_speed_normal * wep_factor)) / 2		
 
 		self.gain_rage(rage)
 
@@ -282,8 +279,8 @@ class CharacterClass:
 		return damage
 
 	# now swing with given weapon
-	def swing(self, weapon, combat_time):
-		if (self.swing_ready(weapon, combat_time)):
+	def swing(self, weapon, combat_time, force = False):
+		if (self.swing_ready(weapon, combat_time) or force):
 			self.last_swing[weapon] = combat_time # reset swing timer
 
 			# white hit damage
@@ -377,6 +374,8 @@ class CharacterClass:
 
 			# log this automatically
 			self.Sim.log(name, damage, hitType)
+
+			# print(combat_time, ":", name, "!", damage)
 
 			return damage, hitType
 
