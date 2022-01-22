@@ -99,6 +99,10 @@ def heroic_presense(Player, Target, combat_time):
 	Player.buffs['hit_rating'] += (15.77 * 1)
 BuffClass('heroic_presense', heroic_presense)
 
+def unleahsed_rage(Player, Target, combat_time):
+	Player.buffs['attack_power'] *= 1.1
+BuffClass('unleahsed_rage', unleahsed_rage)
+
 enchants = {
 	"mongoose": {
 		"proc": {

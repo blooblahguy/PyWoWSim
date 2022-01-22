@@ -167,7 +167,7 @@ class CharacterClass:
 		self.stats['agility'] *= self.agility_mult
 
 		# unleashed rage?
-		self.stats['attack_power'] *= 1.1
+		# self.stats['attack_power'] *= 1.1
 
 		# lastly add strength to AP
 		self.stats['attack_power'] += self.stats['strength'] * 2
