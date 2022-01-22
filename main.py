@@ -1,6 +1,7 @@
 import time
 import threading
 from __init__ import *
+# from abilities import *
 # from structs import *
 # from tkinter import *
 
@@ -19,25 +20,36 @@ class SimClass():
 		self.damage_log = {}
 		self.mins = {}
 		self.maxes = {}
+		self.Abilities = create_abilities()
 		Sims[name] = self
 
-		for ability in Abilities:
-			ability_list.append(ability)
+		for ability in self.Abilities:
+			if not ability in ability_list:
+				ability_list.append(ability)
 
 		for ability in ability_list:
 			self.mins[ability] = 10000
 			self.maxes[ability] = 0
 
 	def log(self, name, damage, hitType):
-		damage = damage != False and damage or 0
+		if (damage != 0 and damage == False):
+			return
+		# damage = damage != False and damage or 0
 
 		data = damage_format.copy()
 		data['damage'] = damage
 		data['casts'] += 1
+		if (hitType == "miss"):
+			data['misses'] += 1
+		elif (hitType == "dodge"):
+			data['dodges'] += 1
+		elif (hitType == "crit"):
+			data['crits'] += 1
+
 		self.total_dmg += damage
 		self.total_dmg += damage
 
-		self.mins[name] = min(self.mins[name], damage)
+		self.mins[name] = damage > 0 and min(self.mins[name], damage) or self.mins[name]
 		self.maxes[name] = max(self.maxes[name], damage)
 
 		# place in the log
@@ -52,7 +64,7 @@ class SimClass():
 			},
 		}
 
-		for ability in Abilities:
+		for ability in self.Abilities:
 			damage['abilities'][ability] = damage_format.copy()
 
 		# loop through combat log
@@ -83,10 +95,9 @@ def combat_loop():
 	HitTable = HitTableClass()
 
 	# initialize things inside of this thread
-	Player = CharacterClass()
+	Player = CharacterClass(Sim)
 	Player.HitTable = HitTable
 	Player.Target = Target
-	Player.Sim = Sim
 	HitTable.Player = Player
 	HitTable.Target = Target
 	Player.equip("Dragonstrike")
@@ -117,13 +128,13 @@ def combat_loop():
 		Sim.combat_time = combat_time
 		Target.hp = (100 - combat_time / settings['combat_seconds'] * 100) # set target hp
 
+		# lust first 
+		Player.cast("heroism", combat_time)
+
 		# anger management
 		if (combat_time > Player.last_anger_rage + 3):
 			Player.last_anger_rage = combat_time
 			Player.gain_rage(1)
-
-		# bloodrage
-		# print(combat_time, Player.can_cast("bloodrage", combat_time))
 		
 		# bloodrage logic
 		if (Player.remaining_cooldown("bloodrage", combat_time) == 0 and Player.rage < 30):
@@ -143,6 +154,11 @@ def combat_loop():
 
 
 		# lets pop cooldowns first
+		# deathwish
+		Player.cast("death_wish", combat_time)
+		
+		# trinkets
+		# Player.cast("Bloodlust Brooch", combat_time)
 
 		# auto attack mainhand
 		if (Player.swing_ready("mainhand", combat_time)):
@@ -210,14 +226,24 @@ averages = {
 	"overcapped_rage": 0,
 }
 
+# averages[ability]
+
+# total abilities
+for ability in ability_list:
+	averages[ability] = {
+		"damage": 0,
+		"casts": 0,
+		"min": 10000,
+		"max": 0,
+		"unused_off_cooldown": 0,
+	}
+
 print("")
 print("=================== SIM TOTALS ===================")
 for name in Sims:
 	Sim = Sims[name]
-	# print(name, ":", "--- %s seconds ---" % round(time.time() - Sim.start_time, 3))
 
 	damage = Sim.calculate_totals()
-	print(damage)
 	dps = damage['totals']['damage'] / settings['combat_seconds']
 
 	averages["dps"] += dps
@@ -225,38 +251,32 @@ for name in Sims:
 
 	# total abilities
 	for ability in ability_list:
-		
-		averages[ability] = {}
+		averages[ability]['damage'] += damage['abilities'][ability]['damage']
+		averages[ability]['casts'] += damage['abilities'][ability]['casts']
+		averages[ability]['min'] = min(Sim.mins[ability], averages[ability]['min'])
+		averages[ability]['max'] = max(Sim.maxes[ability], averages[ability]['max'])
 		try:
-			averages[ability]['damage'] = damage['abilities'][ability]['damage']
+			# print(Sim.Abilities[ability].unused_off_cooldown)
+			averages[ability]['unused_off_cooldown'] += Sim.Abilities[ability].unused_off_cooldown
 		except:
 			pass
-		# averages[ability]['damage'] += damage['abilities'][ability]['damage']
-		averages[ability]['min'] = Sim.mins[ability]
-		averages[ability]['max'] = Sim.maxes[ability]
-		averages[ability]['casts'] = damage['abilities'][ability]['casts']
 
-	# print(Sim.combat_time)
-	# print(round(Sim.overcapped_rage), "rage overcapped")
-	# print(round(damage['totals']['damage'], 1), "damage done", round(dps, 1), "dps")
-	# print("")
-
-print("sim finals:", "--- %s seconds ---" % round(time.time() - sim_start, 3))
+print("Sim:", "--- %s seconds ---" % round(time.time() - sim_start, 3))
 print("DPS:", round(averages["dps"] / settings['iterations'], 1))
 print("Rage Overcap:", round(averages["overcapped_rage"] / settings['iterations']))
 for ability in ability_list:
 	casts = averages[ability]['casts'] / settings['iterations']
-	damage = round(averages[ability]['damage']) / settings['iterations']
-	min = averages[ability]['max'] > 0 and round(averages[ability]['min']) / settings['iterations'] or 0
-	max = averages[ability]['max'] > 0 and round(averages[ability]['max']) / settings['iterations'] or 0
+	damage = "{:,}".format(round(averages[ability]['damage']) / settings['iterations'])
+	min = "{:,}".format(averages[ability]['max'] > 0 and round(averages[ability]['min']))
+	max = "{:,}".format(averages[ability]['max'] > 0 and round(averages[ability]['max']))
+	unused_off_cooldown = 0
+	try:
+		unused_off_cooldown = "{:,}".format(round(averages[ability]['unused_off_cooldown']) / settings['iterations'])
+	except:
+		pass
 
 	if (casts > 0):
-		print(ability,": ", "Damage:", damage, "Casts: ", casts, "Min:", min, "Max:", max)
-
-	# if (averages[ability]['max'] > 0):
-	# 	print(ability, ": Damage", round(averages[ability]['damage']),": Min", round(averages[ability]['min']) / settings['iterations'], "- Max", round(averages[ability]['max']) / settings['iterations'])
-	# averages[ability]['min'] = Sim.mins[ability]
-	# averages[ability]['max'] = Sim.maxes[ability]
+		print(ability,": ", "Damage:", damage, "Casts: ", casts, "Min:", min, "Max:", max, "Unused:", unused_off_cooldown)
 
 # for res in results:
 # 	print(res, results[res])

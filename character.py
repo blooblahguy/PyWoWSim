@@ -10,7 +10,9 @@ from __init__ import *
 # 33 Agility = 1% Crit
 
 class CharacterClass:
-	def __init__(self):
+	def __init__(self, Sim):
+		self.Sim = Sim
+
 		self.items = {
 			"helm": False,
 			"neck": False,
@@ -38,11 +40,10 @@ class CharacterClass:
 
 		# naked stats for level 70
 		self.race = "human"
-		self.gcd = 1.5
 
 		self.ability_casts = {}
-		for key in Abilities:
-			self.ability_casts[key] = -Abilities[key].cooldown
+		for key in self.Sim.Abilities:
+			self.ability_casts[key] = -self.Sim.Abilities[key].cooldown
 
 		# add in all static sources of stats
 		self.strength_mult = 1 # kings base
@@ -78,19 +79,24 @@ class CharacterClass:
 		self.last_bloodrage = 0
 		self.blood_rage_total = 0
 		self.blood_rage_active = False
+		self.last_deathwish = 0
 
 		#gcd
+		self.base_gcd = 1.5
+		self.gcd = self.base_gcd
 		self.off_gcd = True
 		self.last_gcd = 10
+		self.reported_gcd1 = False
+		self.reported_gcd2 = False
 
 	# add buffs to character
-	def apply_buffs(self, combat_time = 0):
+	def apply_buffs(self, ct):
 		# apply the buff callbacks
 		self.buffs = stat_struct.copy()
 		for name in Buffs:
 			if (Buffs[name].enabled):
 				# print(name)
-				Buffs[name].apply(self, self.Target, combat_time)
+				Buffs[name].apply(self, self.Target, ct)
 
 	# equip item to character
 	def equip(self, itemName, slot = False):
@@ -119,7 +125,7 @@ class CharacterClass:
 		self.calculate_gear_stats()
 
 		# add buffs in
-		self.apply_buffs()
+		self.apply_buffs(0)
 
 		# add talents in
 		self.calculate_talent_stats()
@@ -127,7 +133,7 @@ class CharacterClass:
 		# turn final strength into additional AP
 		self.stats_finalize()	
 
-		print(self.stats)
+		# print(self.stats)
 
 	def stats_finalize(self):
 		# add gear
@@ -166,7 +172,7 @@ class CharacterClass:
 	
 	# tally talent stats and place in storage
 	def calculate_talent_stats(self):
-		Abilities['heroic_strike'].cost = 15 - self.talents['improved_heroic_strike']
+		self.Sim.Abilities['heroic_strike'].cost = 15 - self.talents['improved_heroic_strike']
 		self.gear_stats['crit_rating'] += (22.08 * self.talents['cruelty'])
 
 	# tally gear stats and place in storage
@@ -293,17 +299,34 @@ class CharacterClass:
 		return False, False
 
 	def remaining_cooldown(self, name, combat_time):
-		ability = Abilities[name]
+		ability = self.Sim.Abilities[name]
 		last_used = self.ability_casts[name]
 
 		return round(max(0.0, last_used + ability.cooldown - combat_time), 2)
+
+	def update_haste(self):
+		# change gcd with haste
+		self.gcd = max(1, self.base_gcd - ((self.base_gcd / 2) * self.stats['haste']))
+		self.items["mainhand"].stats['speed'] = self.items["mainhand"].stats['base_speed'] / ((self.stats['haste']) + 1)
+		self.items["offhand"].stats['speed'] = self.items["offhand"].stats['base_speed'] / ((self.stats['haste']) + 1)
+
+		# Attack speed = base weapon speed / ((haste percentage / 100) + 1)
 	
+	def off_gcd_check(self, combat_time):
+		self.update_haste()
+
+		if (self.off_gcd or combat_time >= float(self.last_gcd + self.gcd)):
+			self.off_gcd = True
+		else:
+			self.off_gcd = False
+
+		return self.off_gcd
+
 	def can_cast(self, name, combat_time):
-		ability = Abilities[name]
+		ability = self.Sim.Abilities[name]
 
 		# off gcd?
-		if (not ability.triggersGCD or (self.off_gcd or combat_time >= float(self.last_gcd + self.gcd))):
-			self.off_gcd = True
+		if (not ability.triggersGCD or self.off_gcd_check(combat_time)):
 
 			last_used = self.ability_casts[name]
 
@@ -314,18 +337,20 @@ class CharacterClass:
 
 			# can we afford it?
 			if (ability.cost > self.rage):
-				# if (combat_time > 20):
+				if (combat_time > 10):
+					ability.unused_off_cooldown += 0.1
 					# print("can't afford off cooldown", name, combat_time)
 				return False
 			
 			return True
 			
-		self.off_gcd = False
 		return False
 
 	def cast(self, name, combat_time):
+		ability = self.Sim.Abilities[name]
+		ability.update(self, self.Target, combat_time)
+
 		if (self.can_cast(name, combat_time)):
-			ability = Abilities[name]
 
 			# ok we're casting it, set the last GCD to now
 			if (ability.triggersGCD):
@@ -337,10 +362,10 @@ class CharacterClass:
 			self.ability_casts[name] = combat_time # we casted this, put it on CD
 
 			# raw damage
-			damage = ability.cast(self, self.Target)
+			damage = ability.cast(self, self.Target, combat_time)
 
 			# now reduce/filter it
-			if (damage == 0):
+			if (damage == 0 or damage == False):
 				hitType = "cast"
 			else:
 				damage, hitType = self.HitTable.calc_special_hit(damage)

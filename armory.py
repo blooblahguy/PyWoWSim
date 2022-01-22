@@ -58,14 +58,14 @@ class Item:
 ## weapons
 ############################
 Item('Dragonstrike', "mainhand", {
-	"speed": 2.7,
+	"base_speed": 2.7,
 	"type": "sword",
 	"min_damage": 184,
 	"max_damage": 343,
 })
 
 Item('Spiteblade', "offhand", {
-	"speed": 2.7,
+	"base_speed": 2.7,
 	"type": "sword",
 	"min_damage": 165,
 	"max_damage": 308,
@@ -73,7 +73,7 @@ Item('Spiteblade', "offhand", {
 })
 
 Item('Merciless Gladiator\'s Slicer', "offhand", {
-	"speed": 2.6,
+	"base_speed": 2.6,
 	"type": "sword",
 	"min_damage": 203,
 	"max_damage": 305,
@@ -85,6 +85,7 @@ Item('Merciless Gladiator\'s Slicer', "offhand", {
 Item('Talon of Azshara', {
 	"slot": "offhand",
 	"type": "sword",
+	"base_speed": 2.7,
 	"min_damage": 182,
 	"max_damage": 339,
 	"agility": 15,

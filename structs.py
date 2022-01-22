@@ -19,7 +19,8 @@ stat_struct = {
 # for creating new items
 item_struct = stat_struct.copy()
 item_struct["is_weapon"] = False
-item_struct["speed"] = 0
+item_struct["base_speed"] = 0
+item_struct["speed"] = 0 # after haste
 item_struct["min_damage"] = 0
 item_struct["max_damage"] = 0
 item_struct["gems"] = {
@@ -52,7 +53,10 @@ procs_default = {
 damage_format = {
 	"damage": 0,
 	"crit": False,
+	"crits": 0,
 	"miss": False,
+	"misses": 0,
 	"dodge": False,
+	"dodges": 0,
 	"casts": 0,
 }
