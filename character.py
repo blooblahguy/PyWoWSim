@@ -133,7 +133,7 @@ class CharacterClass:
 		# turn final strength into additional AP
 		self.stats_finalize()	
 
-		# print(self.stats)
+		print(self.stats)
 
 	def stats_finalize(self):
 		# add gear
@@ -166,8 +166,13 @@ class CharacterClass:
 		self.stats['strength'] *= self.strength_mult
 		self.stats['agility'] *= self.agility_mult
 
+		# unleashed rage?
+		self.stats['attack_power'] *= 1.1
+
 		# lastly add strength to AP
 		self.stats['attack_power'] += self.stats['strength'] * 2
+
+		# imp berserker stance
 		self.stats['attack_power'] *= 1 + (.02 * self.talents['improved_berserker_stance'])
 	
 	# tally talent stats and place in storage

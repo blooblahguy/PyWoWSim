@@ -51,7 +51,7 @@ def leader_of_the_pack(Player, Target, combat_time):
 BuffClass('leader_of_the_pack', leader_of_the_pack)
 
 def battle_shout(Player, Target, combat_time):
-	Player.buffs['attack_power'] += 306 * (1 + .05 * Player.talents['commanding_presence'])
+	Player.buffs['attack_power'] += (306 + 70) * (1 + .05 * Player.talents['commanding_presence'])
 BuffClass('battle_shout', battle_shout)
 
 def gift_of_the_wild(Player, Target, combat_time):
