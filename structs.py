@@ -59,4 +59,5 @@ damage_format = {
 	"dodge": False,
 	"dodges": 0,
 	"casts": 0,
+	"hits": 0,
 }

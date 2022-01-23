@@ -1,18 +1,24 @@
 import time
 import threading
+# import cProfile
+# import multiprocessing
+
 from __init__ import *
+
 # from abilities import *
 # from structs import *
 # from tkinter import *
 
-ability_list = ["mainhand", "offhand"]
+ability_list = ["mainhand", "offhand", "bloodthirst", "whirlwind", "execute", "heroic_strike"]
 
-Sims = {}
 class SimClass():
-	def __init__(self):
-		t = threading.current_thread()
+	def __init__(self, name):
+		# if (name == False):
+		# 	t = threading.current_thread()
+		# 	self.name = t.name
+		# else:
+		self.name = name
 
-		self.name = t.name
 		self.start_time = time.time()
 		self.total_dmg = 0
 		self.combat_time = 0
@@ -22,11 +28,9 @@ class SimClass():
 		self.maxes = {}
 		self.last_wf = 0
 		self.Abilities = create_abilities()
+		self.Cooldowns = create_cooldowns()
+		self.uptimes = {}
 		Sims[name] = self
-
-		for ability in self.Abilities:
-			if not ability in ability_list:
-				ability_list.append(ability)
 
 		for ability in ability_list:
 			self.mins[ability] = 10000
@@ -40,6 +44,9 @@ class SimClass():
 		data = damage_format.copy()
 		data['damage'] = damage
 		data['casts'] += 1
+		if (hitType != "miss" and hitType != "dodge"):
+			data['hits'] += 1
+
 		if (hitType == "miss"):
 			data['misses'] += 1
 		elif (hitType == "dodge"):
@@ -55,6 +62,14 @@ class SimClass():
 
 		# place in the log
 		self.damage_log[len(self.damage_log) + 1] = [name, data]
+
+	def remaining_time(self):
+		pass
+
+	def time_until_execute(self):
+		if (self.Target.hp < 20): return 0
+		if (settings['execute_range'] == 0): return 0
+		return settings['combat_seconds'] * (1 - settings['execute_range'] * .01) - self.combat_time
 
 	def calculate_totals(self):
 		damage = {
@@ -84,8 +99,8 @@ class SimClass():
 		return damage
 
 def combat_loop():
-	# this is a new sim thread
-	Sim = SimClass()
+	name = threading.current_thread().name
+	Sim = SimClass(name)
 
 	# target
 	Target = TargetClass()
@@ -120,6 +135,10 @@ def combat_loop():
 	Player.equip("Sunfury Bow of the Phoenix", "ranged")
 
 	Player.calculate_stats()
+	# print(Player.stats)
+
+	Sim.Target = Target
+	Sim.Player = Player
 
 	# start loop
 	combat_time = 0
@@ -129,107 +148,66 @@ def combat_loop():
 		Sim.combat_time = combat_time
 		Target.hp = (100 - combat_time / settings['combat_seconds'] * 100) # set target hp
 
-		# lust first 
-		Player.cast("heroism", combat_time)
+		# action combat tick
+		do_action("combat_tick_first", combat_time, Player, Target)
 
 		# anger management
-		if (combat_time > Player.last_anger_rage + 3):
+		if (combat_time >= Player.last_anger_rage + 3):
 			Player.last_anger_rage = combat_time
 			Player.gain_rage(1)
-		
-		# bloodrage logic
-		if (Player.remaining_cooldown("bloodrage", combat_time) == 0 and Player.rage < 30):
-			Player.cast("bloodrage", combat_time)
-			Player.last_bloodrage = combat_time
-			Player.blood_rage_total = 0
-			Player.blood_rage_active = True
 
-		# gain rage overtime from bloodrage
-		if (Player.blood_rage_active and combat_time > Player.last_bloodrage + 1):
-			Player.last_bloodrage = combat_time
-			Player.gain_rage(1)
-			Player.blood_rage_total += 1
-			if (Player.blood_rage_total >= 10):
-				Player.blood_rage_total = 0
-				Player.blood_rage_active = False
-
-
-		# lets pop cooldowns first
-		# deathwish
-		Player.cast("death_wish", combat_time)
-		Player.cast("bloodlust_brooch", combat_time)
-		if (not Sim.Abilities['bloodlust_brooch'].active):
-			Player.cast("empty_diremug", combat_time)
-
-		# trinkets
-		# Player.cast("Bloodlust Brooch", combat_time)
+		# lust first 
+		Sim.Cooldowns["heroism"].use(combat_time, Player, Target)
 
 		# auto attack mainhand
-		if (Player.swing_ready("mainhand", combat_time)):
-			# check if we're doing heroic strike
-			if (Player.queue_heroic_strike):
-				Player.queue_heroic_strike = False 
-				Player.items["mainhand"].last_hit = combat_time # reset swing timer
-				Player.cast("heroic_strike", combat_time)
-			else:
-				# if not, then swing mainhand
-				Player.swing("mainhand", combat_time)
-
-			# try to proc windfury (yes even off of heroic strike)
-			if (combat_time > Sim.last_wf + 3):
-				Sim.last_wf = combat_time
-				roll = random.randrange(0, 100)
-				if (roll > 20):
-					Player.stats['attack_power'] += 445
-					Player.swing("mainhand", combat_time, True)
-					Player.stats['attack_power'] -= 445
+		Player.swing("mainhand", combat_time)
 
 		# auto attack offhand
 		Player.swing("offhand", combat_time)
 
-		# START CASTING SPELLS
-		# do execute rotation?
-		if (Target.hp <= settings['execute_range']):
-			if (Player.remaining_cooldown("bloodthirst", combat_time) < 2.6 and Player.rage < 30):
-				continue # we'll wait for bloodthirst and make sure we have rage
+		## START APL
 
-			Player.cast("bloodthirst", combat_time)
-			Player.cast("execute", combat_time)
+		# lets pop cooldowns first, prefer to use them during execute
+		# deathwish
+		if (Sim.time_until_execute() > 180 or Sim.time_until_execute() == 0): # save for execute if we're only getting one
+			Sim.Cooldowns["death_wish"].use(combat_time, Player, Target)
 
-			continue # we've casted execute. nice, move on
+		# trinkets
+		if (Sim.time_until_execute() > 120 or Sim.time_until_execute() == 0): # save for execute if we're only getting one
+			Sim.Cooldowns["bloodlust_brooch"].use(combat_time, Player, Target)
+			if (not Sim.Cooldowns['bloodlust_brooch'].active): # these trinkets share a cooldown / active
+				Sim.Cooldowns["empty_diremug"].use(combat_time, Player, Target)
 
-		# bloodthirst
+		# bloodrage logic
+		if (Player.rage < 30):
+			Sim.Cooldowns["bloodrage"].use(combat_time, Player, Target)
+
+		# bloodthirst always #1 priority
 		Player.cast("bloodthirst", combat_time)
 
-		# whirlwind
-		Player.cast("whirlwind", combat_time)
+		# EXECUTE ROTATION HERE
+		if (Target.hp <= settings['execute_range']):
+			if (Sim.Abilities["bloodthirst"].remaining_cooldown(combat_time) < 2 and Player.rage < 20):
+				continue # we'll wait for bloodthirst and make sure we have rage
+			Player.cast("execute", combat_time)
+			continue # we're in execute range, we've casted execute. nice, move on
+
+		Player.cast("whirlwind", combat_time) # whirlwind
 
 		# should we heroic strike?
-		if (Target.hp > settings['execute_range']): # not during execute
-			if ((Player.remaining_cooldown("bloodthirst", combat_time) > 1 and (Player.remaining_cooldown("whirlwind", combat_time) > 1 and Player.rage >= 60)) or Player.rage > 80):
-				Player.queue_heroic_strike = True
+		if ((Sim.Abilities["bloodthirst"].remaining_cooldown(combat_time) > 1 and Player.rage >= 60) or Player.rage > 70):
+			Player.queue_heroic_strike = True
 
-	# log results
-	results[Sim.name] = "--- %s seconds ---" % round(time.time() - Sim.start_time, 3)
-
-	# damage = Sim.calculate_totals()
-	# dps = damage['totals']['damage'] / settings['combat_seconds']
-
-	# print(Sim.overcapped_rage, "rage overcapped")
-	# print(round(damage['totals']['damage'], 2), "damage done", dps, "dps")
-
-# combat_loop()
-
-# create combat threads
+Sims = {}
 sim_start = time.time()
 threads = []
 for i in range(settings['iterations']):
-	name = "Thread " + str(i)
-	t = threading.Thread(name = name, target = combat_loop)
+	# name = str("Thread " + str(i))
+	t = threading.Thread(target = combat_loop)
 	threads.append(t)
 	t.start()
 
-# # # now join them all and finish up
+# now join them all and finish up
 for t in threads:
 	t.join()
 
@@ -239,13 +217,12 @@ averages = {
 	"overcapped_rage": 0,
 }
 
-# averages[ability]
-
 # total abilities
 for ability in ability_list:
 	averages[ability] = {
 		"damage": 0,
 		"casts": 0,
+		"hits": 0,
 		"min": 10000,
 		"max": 0,
 		"unused_off_cooldown": 0,
@@ -266,6 +243,7 @@ for name in Sims:
 	for ability in ability_list:
 		averages[ability]['damage'] += damage['abilities'][ability]['damage']
 		averages[ability]['casts'] += damage['abilities'][ability]['casts']
+		averages[ability]['hits'] += damage['abilities'][ability]['hits']
 		averages[ability]['min'] = min(Sim.mins[ability], averages[ability]['min'])
 		averages[ability]['max'] = max(Sim.maxes[ability], averages[ability]['max'])
 		try:
@@ -277,20 +255,37 @@ for name in Sims:
 print("Sim:", "--- %s seconds ---" % round(time.time() - sim_start, 3))
 print("DPS:", round(averages["dps"] / settings['iterations'], 1))
 print("Rage Overcap:", round(averages["overcapped_rage"] / settings['iterations']))
+
+# merge mainhand and offhand into one table
+ability_list.append('melee')
+averages['melee'] = averages['mainhand']
+averages['melee']['damage'] += averages['offhand']['damage']
+averages['melee']['hits'] += averages['offhand']['hits']
+averages['melee']['casts'] += averages['offhand']['casts']
+averages['melee']['min'] = min(averages['melee']['min'], averages['offhand']['min'])
+averages['melee']['max'] = max(averages['melee']['max'], averages['offhand']['max'])
+ability_list.remove('mainhand')
+ability_list.remove('offhand')
+
+# order abilities by damage
+order = {}
 for ability in ability_list:
-	casts = averages[ability]['casts'] / settings['iterations']
-	damage = "{:,}".format(round(averages[ability]['damage']) / settings['iterations'])
-	min = "{:,}".format(averages[ability]['max'] > 0 and round(averages[ability]['min']))
-	max = "{:,}".format(averages[ability]['max'] > 0 and round(averages[ability]['max']))
-	unused_off_cooldown = 0
-	try:
-		unused_off_cooldown = "{:,}".format(round(averages[ability]['unused_off_cooldown']) / settings['iterations'])
-	except:
-		pass
+	damage = round(averages[ability]['damage']) / settings['iterations']
+	order[ability] = damage
+order = dict(sorted(order.items(), key = lambda kv: kv[1], reverse = True))
 
-	if (casts > 0):
-		print(ability,": ", "Damage:", damage, "Casts: ", casts, "Min:", min, "Max:", max, "Unused:", unused_off_cooldown)
+# loop through abilities in damage order and display summary
+for ability in order:
+	average = {
+		"damage": (round(averages[ability]['damage']) / settings['iterations']) / 1000,
+		"min": (averages[ability]['max'] > 0 and round(averages[ability]['min'])) / 1000,
+		"max": (averages[ability]['max'] > 0 and round(averages[ability]['max'])) / 1000,
+		"casts": averages[ability]['casts'] / settings['iterations'],
+		"hits": averages[ability]['hits'] / settings['iterations'],
+	}
 
+	if (average['casts'] > 0):
+		print("[bold magenta]"+ability+"[/bold magenta]", average)
 
 	# buff uptimes?
 
@@ -305,9 +300,9 @@ for ability in ability_list:
 # class Root(Tk):
 #     def __init__(self):
 #         super(Root,self).__init__()
- 
+
 #         self.title("Python Tkinter")
 #         self.minsize(500,400)
- 
+
 # root = Root()
 # root.mainloop()

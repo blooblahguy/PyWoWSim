@@ -13,8 +13,17 @@ class Ability:
 		self.last_casted = 0
 		self.unused_off_cooldown = 0
 
+	def can_cast(self, combat_time):
+		if (self.last_casted == 0 or combat_time >= self.last_casted + self.cooldown):
+			return True
+		else:
+			return False
+
+	def remaining_cooldown(self, combat_time):
+		return self.last_casted + self.cooldown - combat_time
+
 	def on_cooldown(self, combat_time):
-		if (self.last_used + self.cooldown > combat_time):
+		if (self.last_casted + self.cooldown >= combat_time):
 			return True
 		else:
 			return False
@@ -24,18 +33,14 @@ class Ability:
 			self.active = True
 		return self.callback(Player, Target)
 
-	def update(self, Player, Target, combat_time):
-		if (self.duration == 0):
-			return
-		if (self.last_casted != 0 and combat_time > float(self.last_casted) + float(self.duration)):
-			self.last_casted = 0
-			self.active = False
-			self.callback(Player, Target, True)
-
-#blood rage
-def bloodrage(Player, Target, removed = False):
-	Player.gain_rage(10)
-	return 0
+	# def update(self, Player, Target, combat_time):
+	# 	if (self.duration == 0):
+	# 		self.active = False
+	# 		return
+	# 	if (self.last_casted != 0 and combat_time >= float(self.last_casted) + float(self.duration)):
+	# 		self.last_casted = 0
+	# 		self.active = False
+	# 		self.callback(Player, Target, True)
 
 #heroic strike
 def heroic_strike(Player, Target, removed = False):
@@ -66,30 +71,6 @@ def execute(Player, Target):
 	Player.spend_rage(Player.rage) # zero out rage
 	return damage
 
-#death wish
-def death_wish(Player, Target, removed = False):
-	if (removed != False):
-		Player.stats['damage_mult'] += 0.2
-	else:
-		Player.stats['damage_mult'] -= 0.2
-	return 0
-
-#heroism
-def heroism(Player, Target, removed = False):
-	if (removed != False):
-		Player.stats['haste'] += 0.3
-	else:
-		Player.stats['haste'] -= 0.3
-	return 0
-
-#death wish
-def bloodlust_brooch(Player, Target, removed = False):
-	if (removed != False):
-		Player.stats['attack_power'] += 278
-	else:
-		Player.stats['attack_power'] -= 278
-	return 0
-
 #whirlwind
 # def whirlwind_offhand(Player, Target):
 # 	damage = Player.normalize_swing("offhand", Player.items["offhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
@@ -97,22 +78,20 @@ def bloodlust_brooch(Player, Target, removed = False):
 # whirlwind_offhand = Ability("whirlwind_offhand", whirlwind_offhand, 30, 8)
 
 def create_abilities():
-	global death_wish, death_wish_remove, bloodrage, heroic_strike, bloodthirst, whirlwind, execute
+	global death_wish, death_wish_remove, heroic_strike, bloodthirst, whirlwind, execute
+
+	# def test_ability(Player, Target):
+	# 	return 1000
 
 	# abilities
 	Abilities = {}
 
-	Abilities["bloodrage"] = Ability("bloodrage", bloodrage, 0, 60, False)
 	Abilities["heroic_strike"] = Ability("heroic_strike", heroic_strike, 15, 0)
 	Abilities["bloodthirst"] = Ability("bloodthirst", bloodthirst, 30, 6)
 	Abilities["whirlwind"] = Ability("whirlwind", whirlwind, 30, 9)
 	Abilities["execute"] = Ability("execute", execute, 15, 0)
 
-	# cooldowns
-	Abilities["death_wish"] = Ability("death_wish", death_wish, 10, 180, True, 30)
-	Abilities["bloodlust_brooch"] = Ability("bloodlust_brooch", bloodlust_brooch, 0, 120, False, 20)
-	Abilities["empty_diremug"] = Ability("empty_diremug", bloodlust_brooch, 0, 120, False, 20)
-
-	Abilities["heroism"] = Ability("heroism", heroism, 0, 600, False, 40)
+	# no cost no cooldown, testing gcd stuff
+	# Abilities["test_ability"] = Ability("test_ability", test_ability, 0, 0)
 
 	return Abilities

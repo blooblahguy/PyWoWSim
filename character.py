@@ -1,6 +1,7 @@
 import random
 from functions import *
 from __init__ import *
+from classes.actions import *
 
 # 15.77 Hit Rating = 1% Hit
 # 3.9423 Expertise Rating = 1 Expertise = -0.25% Dodge/Parry
@@ -41,10 +42,6 @@ class CharacterClass:
 		# naked stats for level 70
 		self.race = "human"
 
-		self.ability_casts = {}
-		for key in self.Sim.Abilities:
-			self.ability_casts[key] = -self.Sim.Abilities[key].cooldown
-
 		# add in all static sources of stats
 		self.strength_mult = 1 # kings base
 		self.agility_mult = 1 # kings base
@@ -54,6 +51,7 @@ class CharacterClass:
 		self.character_stats["agility"] = 96
 		self.gear_stats = stat_struct.copy() # stats from gear
 		self.buffs = stat_struct.copy() # tracking active buffs and stats
+		self.cooldowns = stat_struct.copy() # tracking procs (active or not) and stats
 		self.procs = {} # tracking procs (active or not) and stats
 		self.stats = stat_struct.copy() # final calculated stats
 
@@ -79,7 +77,8 @@ class CharacterClass:
 		self.last_bloodrage = 0
 		self.blood_rage_total = 0
 		self.blood_rage_active = False
-		self.last_deathwish = 0
+		self.flurry = 0
+		self.last_wf = -3
 
 		#gcd
 		self.base_gcd = 1.5
@@ -89,14 +88,20 @@ class CharacterClass:
 		self.reported_gcd1 = False
 		self.reported_gcd2 = False
 
+		add_action("combat_tick_first", self.update)
+
+	def update(self, combat_time, Player, Target):
+		self.update_gcd()
+		self.update_haste()
+
 	# add buffs to character
-	def apply_buffs(self, ct):
+	def apply_buffs(self, combat_time = 0):
 		# apply the buff callbacks
 		self.buffs = stat_struct.copy()
 		for name in Buffs:
 			if (Buffs[name].enabled):
 				# print(name)
-				Buffs[name].apply(self, self.Target, ct)
+				Buffs[name].apply(self, self.Target, combat_time)
 
 	# equip item to character
 	def equip(self, itemName, slot = False):
@@ -125,15 +130,18 @@ class CharacterClass:
 		self.calculate_gear_stats()
 
 		# add buffs in
-		self.apply_buffs(0)
+		self.apply_buffs()
 
 		# add talents in
 		self.calculate_talent_stats()
 
-		# turn final strength into additional AP
-		self.stats_finalize()	
+		# cooldowns that are active
+		self.calculate_cooldowns()
 
-		print(self.stats)
+		# turn final strength into additional AP
+		self.stats_finalize()
+
+		# print("calculated stats")
 
 	def stats_finalize(self):
 		# add gear
@@ -160,7 +168,7 @@ class CharacterClass:
 		self.stats['crit_chance'] += self.stats['agility'] / 33
 
 		# calculate haste rating
-		self.stats['haste'] = self.stats['haste_rating'] / 15.77
+		self.stats['haste'] = (self.stats['haste_rating'] / 15.77) / 100
 
 		# apply kings
 		self.stats['strength'] *= self.strength_mult
@@ -200,11 +208,13 @@ class CharacterClass:
 						pass
 
 		# add expertise if human
-		if (self.race == "human" and (self.items['mainhand'].stats["type"] == "sword" or self.items['mainhand'].stats["type"] == "mace")):
+		if (self.race == "human" and (self.items['mainhand'].stats["class"] == "sword" or self.items['mainhand'].stats["class"] == "mace")):
 			self.gear_stats['expertise_rating'] += (3.9423 * 5)
 
-	def calculate_proc_stats(self):
-		pass
+	def calculate_cooldowns(self):
+		for stat in self.cooldowns:
+			if (self.cooldowns[stat] > 0):
+				self.stats[stat] += self.cooldowns[stat]
 
 	def gain_rage(self, rage):
 		self.rage += rage
@@ -249,12 +259,6 @@ class CharacterClass:
 		rage = (5/2) * (damage / self.rage_factor)
 		self.gain_rage(rage)
 		return rage
-
-	# check if we're allowed to swing at all
-	def swing_ready(self, weapon, combat_time):
-		if combat_time > self.last_swing[weapon] + self.items[weapon].stats['speed']:
-			return True
-		return False
 		
 
 	# whenever we swing or cast, lets try to proc stuff
@@ -278,10 +282,35 @@ class CharacterClass:
 
 		return damage
 
+	# check if we're allowed to swing at all
+	def swing_ready(self, weapon, combat_time):
+		if combat_time > self.last_swing[weapon] + self.items[weapon].stats['speed']:
+			return True
+		return False
+
+	def apply_flurry(self):
+		# update the haste with new / old flurry
+		self.flurry = 3
+		self.update_haste()
+
 	# now swing with given weapon
 	def swing(self, weapon, combat_time, force = False):
-		if (self.swing_ready(weapon, combat_time) or force):
+		if (self.swing_ready(weapon, combat_time) or force): # force for windfury
 			self.last_swing[weapon] = combat_time # reset swing timer
+
+			# use up a flurry charge
+			self.flurry = max(self.flurry - 1, 0)
+
+			# check if we're doing heroic strike
+			if (self.queue_heroic_strike):
+				self.queue_heroic_strike = False 
+				self.items["mainhand"].last_hit = combat_time # reset swing timer
+				damage, hitType = self.cast("heroic_strike", combat_time)
+
+				if (hitType == "crit"):
+					self.apply_flurry()
+
+				return
 
 			# white hit damage
 			damage = self.normalize_swing(weapon, self.items[weapon].stats['min_damage'], self.items[weapon].stats['max_damage'])
@@ -295,73 +324,83 @@ class CharacterClass:
 			# log this automatically
 			self.Sim.log(weapon, damage, hitType)
 
+			if (hitType == "crit"):
+				self.apply_flurry()
+
+			# try to proc windfury (yes even off of heroic strike)
+			if (combat_time > self.last_wf + 3):
+				self.last_wf = combat_time
+				roll = random.randrange(0, 100)
+				if (roll > 20):
+					self.stats['attack_power'] += 445
+					self.swing("mainhand", combat_time, True) # force a new melee, since we procced WF
+					self.stats['attack_power'] -= 445
+
 			# return hit data
 			return damage, hitType
 		
 		return False, False
 
-	def remaining_cooldown(self, name, combat_time):
-		ability = self.Sim.Abilities[name]
-		last_used = self.ability_casts[name]
-
-		return round(max(0.0, last_used + ability.cooldown - combat_time), 2)
-
-	def update_haste(self):
+	def update_gcd(self):
 		# change gcd with haste
 		self.gcd = max(1, self.base_gcd - ((self.base_gcd / 2) * self.stats['haste']))
+
+	def update_haste(self):
+		# increase weapon speed with haste
 		self.items["mainhand"].stats['speed'] = self.items["mainhand"].stats['base_speed'] / ((self.stats['haste']) + 1)
 		self.items["offhand"].stats['speed'] = self.items["offhand"].stats['base_speed'] / ((self.stats['haste']) + 1)
 
-		# Attack speed = base weapon speed / ((haste percentage / 100) + 1)
+		# increase weapons speed with flurry
+		if (self.flurry > 0):
+			self.items["mainhand"].stats['speed'] = self.items["mainhand"].stats['speed'] / ((100 + 25) / 100)
+			self.items["offhand"].stats['speed'] = self.items["offhand"].stats['speed'] / ((100 + 25) / 100)
 	
 	def off_gcd_check(self, combat_time):
-		self.update_haste()
+		# print(combat_time, self.last_gcd, self.gcd, self.last_gcd + self.gcd)
 
-		if (self.off_gcd or combat_time >= float(self.last_gcd + self.gcd)):
+		if (self.off_gcd or combat_time >= self.last_gcd + self.gcd):
 			self.off_gcd = True
 		else:
 			self.off_gcd = False
 
 		return self.off_gcd
 
-	def can_cast(self, name, combat_time):
-		ability = self.Sim.Abilities[name]
+	# def can_cast(self, name, combat_time):
+	# 	ability = self.Sim.Abilities[name]
 
-		# off gcd?
-		if (not ability.triggersGCD or self.off_gcd_check(combat_time)):
+	# 	# off gcd?
+	# 	if (not ability.triggersGCD or self.off_gcd_check(combat_time)):
 
-			last_used = self.ability_casts[name]
+	# 		last_used = self.ability_casts[name]
 
-			# is it off cooldown?
-			if (combat_time < float(last_used + ability.cooldown)):
-				# print("on cooldown", name)
-				return False
+	# 		# is it off cooldown?
+	# 		print(combat_time, last_used, ability.cooldown, last_used + ability.cooldown)
+	# 		if (combat_time >= float(last_used + ability.cooldown)):
+	# 			# print(combat_time, "on cooldown", name)
+	# 			return False
 
-			# can we afford it?
-			if (ability.cost > self.rage):
-				if (combat_time > 10):
-					ability.unused_off_cooldown += 0.1
-					# print("can't afford off cooldown", name, combat_time)
-				return False
+	# 		# can we afford it?
+	# 		if (ability.cost > self.rage):
+	# 			if (combat_time > 10):
+	# 				ability.unused_off_cooldown += 0.1
+	# 				# print(combat_time, "can't afford off cooldown", name)
+	# 			return False
 			
-			return True
-			
-		return False
+	# 		return True
+	# 	# else:
+	# 		# print(combat_time, "on GCD")
+	# 	return False
 
 	def cast(self, name, combat_time):
 		ability = self.Sim.Abilities[name]
-		ability.update(self, self.Target, combat_time)
+		# ability.update(self, self.Target, combat_time)
 
-		if (self.can_cast(name, combat_time)):
+		# print(combat_time, name, self.off_gcd_check(combat_time), ability.can_cast(combat_time), self.rage >= ability.cost)
 
-			# ok we're casting it, set the last GCD to now
-			if (ability.triggersGCD):
-				self.last_gcd = combat_time
-				self.off_gcd = False
+		if (self.off_gcd_check(combat_time) and ability.can_cast(combat_time) and self.rage >= ability.cost):
+			# print(combat_time, "cast me now")
 
-			# spend the rage, and put it on cooldown
 			self.spend_rage(ability.cost)
-			self.ability_casts[name] = combat_time # we casted this, put it on CD
 
 			# raw damage
 			damage = ability.cast(self, self.Target, combat_time)
@@ -375,9 +414,16 @@ class CharacterClass:
 			# log this automatically
 			self.Sim.log(name, damage, hitType)
 
+			# log this automatically
+			self.Sim.log(name, damage, hitType)
+
 			# print(combat_time, ":", name, "!", damage)
 
-			return damage, hitType
+			# ok we're casting it, set the last GCD to now
+			if (ability.triggersGCD):
+				self.last_gcd = combat_time
+				self.off_gcd = False
 
+			return damage, hitType
 
 		return False, False
