@@ -1,22 +1,18 @@
 import time
-import threading
-# import cProfile
-# import multiprocessing
+# from pyinstrument import Profiler
+import multiprocessing
 
 from __init__ import *
 
-# from abilities import *
-# from structs import *
-# from tkinter import *
-
 ability_list = ["mainhand", "offhand", "bloodthirst", "whirlwind", "execute", "heroic_strike"]
+
+def time_until_execute(combat_time, Target):
+	if (Target.hp < 20): return 0
+	if (settings['execute_range'] == 0): return 0
+	return settings['combat_seconds'] * (1 - settings['execute_range'] / 100) - combat_time
 
 class SimClass():
 	def __init__(self, name):
-		# if (name == False):
-		# 	t = threading.current_thread()
-		# 	self.name = t.name
-		# else:
 		self.name = name
 
 		self.start_time = time.time()
@@ -30,7 +26,6 @@ class SimClass():
 		self.Abilities = create_abilities()
 		self.Cooldowns = create_cooldowns()
 		self.uptimes = {}
-		Sims[name] = self
 
 		for ability in ability_list:
 			self.mins[ability] = 10000
@@ -66,11 +61,6 @@ class SimClass():
 	def remaining_time(self):
 		pass
 
-	def time_until_execute(self):
-		if (self.Target.hp < 20): return 0
-		if (settings['execute_range'] == 0): return 0
-		return settings['combat_seconds'] * (1 - settings['execute_range'] * .01) - self.combat_time
-
 	def calculate_totals(self):
 		damage = {
 			"totals": damage_format.copy(),
@@ -98,8 +88,9 @@ class SimClass():
 
 		return damage
 
-def combat_loop():
-	name = threading.current_thread().name
+def combat_loop(name = "test", TotalSims = {}):
+	# if (name == False):
+	# 	name = threading.current_thread().name
 	Sim = SimClass(name)
 
 	# target
@@ -149,12 +140,8 @@ def combat_loop():
 		Target.hp = (100 - combat_time / settings['combat_seconds'] * 100) # set target hp
 
 		# action combat tick
-		do_action("combat_tick_first", combat_time, Player, Target)
-
-		# anger management
-		if (combat_time >= Player.last_anger_rage + 3):
-			Player.last_anger_rage = combat_time
-			Player.gain_rage(1)
+		if (int(combat_time * 10) % 2 == 0): # every .2s
+			do_action("combat_tick_first", combat_time, Player, Target)
 
 		# lust first 
 		Sim.Cooldowns["heroism"].use(combat_time, Player, Target)
@@ -167,13 +154,15 @@ def combat_loop():
 
 		## START APL
 
+		ttexecute = time_until_execute(combat_time, Target)
+
 		# lets pop cooldowns first, prefer to use them during execute
 		# deathwish
-		if (Sim.time_until_execute() > 180 or Sim.time_until_execute() == 0): # save for execute if we're only getting one
+		if (ttexecute > 180 or ttexecute == 0): # save for execute if we're only getting one
 			Sim.Cooldowns["death_wish"].use(combat_time, Player, Target)
 
 		# trinkets
-		if (Sim.time_until_execute() > 120 or Sim.time_until_execute() == 0): # save for execute if we're only getting one
+		if (ttexecute > 120 or ttexecute == 0): # save for execute if we're only getting one
 			Sim.Cooldowns["bloodlust_brooch"].use(combat_time, Player, Target)
 			if (not Sim.Cooldowns['bloodlust_brooch'].active): # these trinkets share a cooldown / active
 				Sim.Cooldowns["empty_diremug"].use(combat_time, Player, Target)
@@ -198,111 +187,166 @@ def combat_loop():
 		if ((Sim.Abilities["bloodthirst"].remaining_cooldown(combat_time) > 1 and Player.rage >= 60) or Player.rage > 70):
 			Player.queue_heroic_strike = True
 
-Sims = {}
-sim_start = time.time()
-threads = []
-for i in range(settings['iterations']):
-	# name = str("Thread " + str(i))
-	t = threading.Thread(target = combat_loop)
-	threads.append(t)
-	t.start()
+	totals = {}
+	totals['damage'] = Sim.calculate_totals()
+	totals['mins'] = Sim.mins
+	totals['maxes'] = Sim.maxes
+	totals['overcapped_rage'] = Sim.overcapped_rage
+	TotalSims[name] = totals
 
-# now join them all and finish up
-for t in threads:
-	t.join()
+# profiler = Profiler()
+# profiler.start()
 
-# check timings
-averages = {
-	"dps": 0,
-	"overcapped_rage": 0,
-}
+# combat_loop()
 
-# total abilities
-for ability in ability_list:
-	averages[ability] = {
-		"damage": 0,
-		"casts": 0,
-		"hits": 0,
-		"min": 10000,
-		"max": 0,
-		"unused_off_cooldown": 0,
+# profiler.stop()
+# profiler.print()
+
+# exit()
+
+
+# executor = get_reusable_executor(max_workers=4)
+# Sims = list(executor.map(combat_loop, range(settings['iterations']), chunksize=16))
+
+def print_results(TotalSims, total_time):
+	# check timings
+	averages = {
+		"dps": 0,
+		"overcapped_rage": 0,
 	}
-
-print("")
-print("=================== SIM TOTALS ===================")
-for name in Sims:
-	Sim = Sims[name]
-
-	damage = Sim.calculate_totals()
-	dps = damage['totals']['damage'] / settings['combat_seconds']
-
-	averages["dps"] += dps
-	averages["overcapped_rage"] += Sim.overcapped_rage
 
 	# total abilities
 	for ability in ability_list:
-		averages[ability]['damage'] += damage['abilities'][ability]['damage']
-		averages[ability]['casts'] += damage['abilities'][ability]['casts']
-		averages[ability]['hits'] += damage['abilities'][ability]['hits']
-		averages[ability]['min'] = min(Sim.mins[ability], averages[ability]['min'])
-		averages[ability]['max'] = max(Sim.maxes[ability], averages[ability]['max'])
-		try:
-			# print(Sim.Abilities[ability].unused_off_cooldown)
-			averages[ability]['unused_off_cooldown'] += Sim.Abilities[ability].unused_off_cooldown
-		except:
-			pass
+		averages[ability] = {
+			"damage": 0,
+			"casts": 0,
+			"hits": 0,
+			"min": 10000,
+			"max": 0,
+			"unused_off_cooldown": 0,
+		}
 
-print("Sim:", "--- %s seconds ---" % round(time.time() - sim_start, 3))
-print("DPS:", round(averages["dps"] / settings['iterations'], 1))
-print("Rage Overcap:", round(averages["overcapped_rage"] / settings['iterations']))
+	print("")
+	print("=================== SIM TOTALS ===================")
+	# SimInfo = TotalSims
+	# sim_dmg = TotalSims['damage']
+	# sim_mins = TotalSims['mins']
+	# sim_maxes = TotalSims['maxes']
+	# sim_overcapped_rage = TotalSims['overcapped_rage']
+	# print(TotalSims)
+	for SimName in TotalSims:
+		Sim = TotalSims[SimName]
+		# print(Sim)
+		damage = Sim['damage']
+		# Sim = Sims[name]
 
-# merge mainhand and offhand into one table
-ability_list.append('melee')
-averages['melee'] = averages['mainhand']
-averages['melee']['damage'] += averages['offhand']['damage']
-averages['melee']['hits'] += averages['offhand']['hits']
-averages['melee']['casts'] += averages['offhand']['casts']
-averages['melee']['min'] = min(averages['melee']['min'], averages['offhand']['min'])
-averages['melee']['max'] = max(averages['melee']['max'], averages['offhand']['max'])
-ability_list.remove('mainhand')
-ability_list.remove('offhand')
+		# damage = Sim.calculate_totals()
+		dps = damage['totals']['damage'] / settings['combat_seconds']
 
-# order abilities by damage
-order = {}
-for ability in ability_list:
-	damage = round(averages[ability]['damage']) / settings['iterations']
-	order[ability] = damage
-order = dict(sorted(order.items(), key = lambda kv: kv[1], reverse = True))
+		averages["dps"] += dps
+		averages["overcapped_rage"] += Sim['overcapped_rage']
 
-# loop through abilities in damage order and display summary
-for ability in order:
-	average = {
-		"damage": (round(averages[ability]['damage']) / settings['iterations']) / 1000,
-		"min": (averages[ability]['max'] > 0 and round(averages[ability]['min'])) / 1000,
-		"max": (averages[ability]['max'] > 0 and round(averages[ability]['max'])) / 1000,
-		"casts": averages[ability]['casts'] / settings['iterations'],
-		"hits": averages[ability]['hits'] / settings['iterations'],
-	}
+		# total abilities
+		for ability in ability_list:
+			averages[ability]['damage'] += damage['abilities'][ability]['damage']
+			averages[ability]['casts'] += damage['abilities'][ability]['casts']
+			averages[ability]['hits'] += damage['abilities'][ability]['hits']
+			averages[ability]['min'] = min(Sim['mins'][ability], averages[ability]['min'])
+			averages[ability]['max'] = max(Sim['maxes'][ability], averages[ability]['max'])
+			# try:
+			# 	# print(Sim.Abilities[ability].unused_off_cooldown)
+			# 	averages[ability]['unused_off_cooldown'] += Sim.Abilities[ability].unused_off_cooldown
+			# except:
+			# 	pass
 
-	if (average['casts'] > 0):
-		print("[bold magenta]"+ability+"[/bold magenta]", average)
+	print("Sim:", "--- %s seconds ---" % round(total_time, 3))
+	print("DPS:", round(averages["dps"] / settings['iterations'], 1))
+	print("Rage Overcap:", round(averages["overcapped_rage"] / settings['iterations']))
 
-	# buff uptimes?
+	# merge mainhand and offhand into one table
+	ability_list.append('melee')
+	averages['melee'] = averages['mainhand']
+	averages['melee']['damage'] += averages['offhand']['damage']
+	averages['melee']['hits'] += averages['offhand']['hits']
+	averages['melee']['casts'] += averages['offhand']['casts']
+	averages['melee']['min'] = min(averages['melee']['min'], averages['offhand']['min'])
+	averages['melee']['max'] = max(averages['melee']['max'], averages['offhand']['max'])
+	ability_list.remove('mainhand')
+	ability_list.remove('offhand')
 
-	# dodges/misses?
+	# order abilities by damage
+	order = {}
+	for ability in ability_list:
+		damage = round(averages[ability]['damage']) / settings['iterations']
+		order[ability] = damage
+	order = dict(sorted(order.items(), key = lambda kv: kv[1], reverse = True))
 
-	# item upgrades?
+	# loop through abilities in damage order and display summary
+	for ability in order:
+		average = {
+			"damage": (round(averages[ability]['damage']) / settings['iterations']) / 1000,
+			"min": (averages[ability]['max'] > 0 and round(averages[ability]['min'])) / 1000,
+			"max": (averages[ability]['max'] > 0 and round(averages[ability]['max'])) / 1000,
+			"casts": averages[ability]['casts'] / settings['iterations'],
+			"hits": averages[ability]['hits'] / settings['iterations'],
+		}
 
-# for res in results:
-# 	print(res, results[res])
+		if (average['casts'] > 0):
+			print("[bold magenta]"+ability+"[/bold magenta]", average)
 
-# use gui interface
-# class Root(Tk):
-#     def __init__(self):
-#         super(Root,self).__init__()
+		# buff uptimes?
 
-#         self.title("Python Tkinter")
-#         self.minsize(500,400)
+		# dodges/misses?
 
-# root = Root()
-# root.mainloop()
+		# item upgrades?
+
+
+
+
+
+
+	# use gui interface
+	# class Root(Tk):
+	#     def __init__(self):
+	#         super(Root,self).__init__()
+
+	#         self.title("Python Tkinter")
+	#         self.minsize(500,400)
+
+	# root = Root()
+	# root.mainloop()
+
+# method = "raw"
+method = "multiprocess"
+
+if (method == "multiprocess"):
+	if __name__ == "__main__":
+		manager = multiprocessing.Manager()
+		TotalSims = manager.dict()
+
+		sim_start = time.time()
+		threads = []
+		for i in range(0, settings['iterations']):
+			name = "thread" + str(i)
+			# print(name)
+			t = multiprocessing.Process(target=combat_loop, args=(name, TotalSims))
+			t.start()
+			threads.append(t)
+
+		for t in threads:
+			t.join()
+
+		finish_time = time.time()
+		total_time = finish_time - sim_start
+		print_results(TotalSims, total_time)
+
+if (method == "raw"):
+	sim_start = time.time()
+	for i in range(0, settings['iterations']):
+		TotalSims = {}
+		name = "thread" + str(i)
+		combat_loop(name, TotalSims)
+
+	finish_time = time.time()
+	total_time = finish_time - sim_start
+	print_results(TotalSims, total_time)

@@ -1,7 +1,9 @@
-import random
+# from numpy import *
 from functions import *
 from __init__ import *
 from classes.actions import *
+import random
+# from numba import njit, prange
 
 # 15.77 Hit Rating = 1% Hit
 # 3.9423 Expertise Rating = 1 Expertise = -0.25% Dodge/Parry
@@ -34,7 +36,7 @@ class CharacterClass:
 			"offhand": False,
 		}
 
-		self.last_swing = {
+		self.next_swing = {
 			"mainhand": 0,
 			"offhand": 0,
 		}
@@ -84,15 +86,12 @@ class CharacterClass:
 		self.base_gcd = 1.5
 		self.gcd = self.base_gcd
 		self.off_gcd = True
+		self.next_gcd = 0
 		self.last_gcd = 10
 		self.reported_gcd1 = False
 		self.reported_gcd2 = False
 
-		add_action("combat_tick_first", self.update)
-
-	def update(self, combat_time, Player, Target):
-		self.update_gcd()
-		self.update_haste()
+		# add_action("combat_tick_first", self.update)
 
 	# add buffs to character
 	def apply_buffs(self, combat_time = 0):
@@ -141,6 +140,9 @@ class CharacterClass:
 		# turn final strength into additional AP
 		self.stats_finalize()
 
+		self.update_gcd()
+		self.update_haste()
+
 		# print("calculated stats")
 
 	def stats_finalize(self):
@@ -157,10 +159,10 @@ class CharacterClass:
 				pass
 
 		# calculate hit
-		self.stats['hit_chance'] = self.stats['hit_rating'] / 15.77
+		self.stats['hit_chance'] = max(self.stats['hit_rating'] / 15.77, 0)
 
 		# calculate expertise
-		self.stats['expertise'] = ((self.stats['expertise_rating'] / 3.9423) * 0.25) + self.talents["weapon_mastery"]
+		self.stats['expertise'] = min(((self.stats['expertise_rating'] / 3.9423) * 0.25) + self.talents["weapon_mastery"], 6.5)
 
 		# calculate crit chance
 		self.stats['crit_rating'] += (22.08 * 3) # berserker stance
@@ -220,7 +222,7 @@ class CharacterClass:
 		self.rage += rage
 		if (self.rage > 100):
 			self.Sim.overcapped_rage += self.rage - 100
-		self.rage = min(self.rage, 100)
+			self.rage = 100
 
 	def spend_rage(self, rage):
 		self.rage -= rage
@@ -266,7 +268,7 @@ class CharacterClass:
 		pass
 
 	def normalize_swing(self, weapon, min_dmg, max_dmg, bonus = 0, wep_speed = 2.4):
-		damage = random.randrange(min_dmg, max_dmg) + bonus
+		damage = random.randint(min_dmg, max_dmg) + bonus
 
 		wep_speed = 2.4 # normalized for 1h non-daggers
 		# 1.7 for daggers
@@ -282,12 +284,6 @@ class CharacterClass:
 
 		return damage
 
-	# check if we're allowed to swing at all
-	def swing_ready(self, weapon, combat_time):
-		if combat_time > self.last_swing[weapon] + self.items[weapon].stats['speed']:
-			return True
-		return False
-
 	def apply_flurry(self):
 		# update the haste with new / old flurry
 		self.flurry = 3
@@ -295,8 +291,8 @@ class CharacterClass:
 
 	# now swing with given weapon
 	def swing(self, weapon, combat_time, force = False):
-		if (self.swing_ready(weapon, combat_time) or force): # force for windfury
-			self.last_swing[weapon] = combat_time # reset swing timer
+		if (combat_time >= self.next_swing[weapon] or force): # force for windfury
+			self.next_swing[weapon] = combat_time + self.items[weapon].stats['speed'] # reset swing timer
 
 			# use up a flurry charge
 			self.flurry = max(self.flurry - 1, 0)
@@ -304,7 +300,6 @@ class CharacterClass:
 			# check if we're doing heroic strike
 			if (self.queue_heroic_strike):
 				self.queue_heroic_strike = False 
-				self.items["mainhand"].last_hit = combat_time # reset swing timer
 				damage, hitType = self.cast("heroic_strike", combat_time)
 
 				if (hitType == "crit"):
@@ -330,7 +325,7 @@ class CharacterClass:
 			# try to proc windfury (yes even off of heroic strike)
 			if (combat_time > self.last_wf + 3):
 				self.last_wf = combat_time
-				roll = random.randrange(0, 100)
+				roll = random.randint(0, 100)
 				if (roll > 20):
 					self.stats['attack_power'] += 445
 					self.swing("mainhand", combat_time, True) # force a new melee, since we procced WF
@@ -346,6 +341,7 @@ class CharacterClass:
 		self.gcd = max(1, self.base_gcd - ((self.base_gcd / 2) * self.stats['haste']))
 
 	def update_haste(self):
+		# print(time.time(), "updating haste")
 		# increase weapon speed with haste
 		self.items["mainhand"].stats['speed'] = self.items["mainhand"].stats['base_speed'] / ((self.stats['haste']) + 1)
 		self.items["offhand"].stats['speed'] = self.items["offhand"].stats['base_speed'] / ((self.stats['haste']) + 1)
@@ -356,40 +352,9 @@ class CharacterClass:
 			self.items["offhand"].stats['speed'] = self.items["offhand"].stats['speed'] / ((100 + 25) / 100)
 	
 	def off_gcd_check(self, combat_time):
-		# print(combat_time, self.last_gcd, self.gcd, self.last_gcd + self.gcd)
-
-		if (self.off_gcd or combat_time >= self.last_gcd + self.gcd):
-			self.off_gcd = True
-		else:
-			self.off_gcd = False
-
-		return self.off_gcd
-
-	# def can_cast(self, name, combat_time):
-	# 	ability = self.Sim.Abilities[name]
-
-	# 	# off gcd?
-	# 	if (not ability.triggersGCD or self.off_gcd_check(combat_time)):
-
-	# 		last_used = self.ability_casts[name]
-
-	# 		# is it off cooldown?
-	# 		print(combat_time, last_used, ability.cooldown, last_used + ability.cooldown)
-	# 		if (combat_time >= float(last_used + ability.cooldown)):
-	# 			# print(combat_time, "on cooldown", name)
-	# 			return False
-
-	# 		# can we afford it?
-	# 		if (ability.cost > self.rage):
-	# 			if (combat_time > 10):
-	# 				ability.unused_off_cooldown += 0.1
-	# 				# print(combat_time, "can't afford off cooldown", name)
-	# 			return False
-			
-	# 		return True
-	# 	# else:
-	# 		# print(combat_time, "on GCD")
-	# 	return False
+		if (combat_time >= self.next_gcd):
+			return True
+		return False
 
 	def cast(self, name, combat_time):
 		ability = self.Sim.Abilities[name]
@@ -398,7 +363,6 @@ class CharacterClass:
 		# print(combat_time, name, self.off_gcd_check(combat_time), ability.can_cast(combat_time), self.rage >= ability.cost)
 
 		if (self.off_gcd_check(combat_time) and ability.can_cast(combat_time) and self.rage >= ability.cost):
-			# print(combat_time, "cast me now")
 
 			self.spend_rage(ability.cost)
 
@@ -422,7 +386,7 @@ class CharacterClass:
 			# ok we're casting it, set the last GCD to now
 			if (ability.triggersGCD):
 				self.last_gcd = combat_time
-				self.off_gcd = False
+				self.next_gcd = combat_time + self.gcd
 
 			return damage, hitType
 

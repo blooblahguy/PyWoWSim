@@ -1,5 +1,7 @@
 from structs import *
+# from numpy import *
 import random
+
 
 class Ability:
 	def __init__(self, name, callback, cost = 0, cooldown = 0, triggersGCD = True, duration = 0):
@@ -10,37 +12,28 @@ class Ability:
 		self.cooldown = cooldown
 		self.duration = duration
 		self.triggersGCD = triggersGCD
-		self.last_casted = 0
+		self.next_cast = 0
 		self.unused_off_cooldown = 0
 
 	def can_cast(self, combat_time):
-		if (self.last_casted == 0 or combat_time >= self.last_casted + self.cooldown):
+		if (combat_time >= self.next_cast or self.next_cast == 0):
 			return True
 		else:
 			return False
 
 	def remaining_cooldown(self, combat_time):
-		return self.last_casted + self.cooldown - combat_time
+		return self.next_cast - combat_time
 
 	def on_cooldown(self, combat_time):
-		if (self.last_casted + self.cooldown >= combat_time):
+		if (self.next_cast >= combat_time):
 			return True
 		else:
 			return False
 	def cast(self, Player, Target, combat_time):
-		self.last_casted = combat_time
+		self.next_cast = combat_time + self.cooldown
 		if (self.duration > 0):
 			self.active = True
 		return self.callback(Player, Target)
-
-	# def update(self, Player, Target, combat_time):
-	# 	if (self.duration == 0):
-	# 		self.active = False
-	# 		return
-	# 	if (self.last_casted != 0 and combat_time >= float(self.last_casted) + float(self.duration)):
-	# 		self.last_casted = 0
-	# 		self.active = False
-	# 		self.callback(Player, Target, True)
 
 #heroic strike
 def heroic_strike(Player, Target, removed = False):
@@ -54,8 +47,8 @@ def bloodthirst(Player, Target, removed = False):
 
 #whirlwind
 def whirlwind(Player, Target, removed = False):
-	mh_damage = random.randrange(Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
-	oh_damage = (random.randrange(Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage']) + Player.stats['oh_damage'])
+	mh_damage = random.randint(Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage'])
+	oh_damage = (random.randint(Player.items["mainhand"].stats['min_damage'], Player.items["mainhand"].stats['max_damage']) + Player.stats['oh_damage'])
 
 	oh_damage *= 1 + 0.05 * Player.talents['dual_wield_specialization'] # add talent damage
 	oh_damage /= 2 # offhand penalty

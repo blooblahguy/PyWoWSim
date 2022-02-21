@@ -1,13 +1,14 @@
-from rich import print
+# from rich import print
 
 settings = {}
-settings['combat_seconds'] = 165
+settings['combat_seconds'] = 180 #165
 settings['per_second'] = 0.1
-settings['iterations'] = 20
+settings['iterations'] = 100
 settings['execute_range'] = 20
 settings['latency'] = 0
 
 from classes.actions import *
+# from classes.sim import *
 from structs import *
 from armory import *
 

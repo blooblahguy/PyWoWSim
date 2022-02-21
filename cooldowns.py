@@ -10,7 +10,8 @@ class CooldownClass:
 		self.cooldown = cooldown
 		self.duration = duration
 		self.triggersGCD = triggersGCD
-		self.last_used = 0
+		self.next_use = 0
+		self.last_use = 0
 		self.uptime = 0
 
 		add_action("combat_tick_first", self.update)
@@ -20,17 +21,17 @@ class CooldownClass:
 		if (self.active):
 			self.uptime += 0.1
 
-			if (self.last_used > 0 and combat_time >= self.last_used + self.duration):
+			if (combat_time >= self.expire):
 				# print(combat_time, self.name, " being removed")
 				self.active = False
 				self._remove(combat_time, Player, Target)
 				Player.calculate_stats()
 
 	def remaining_cooldown(self, combat_time):
-		return max(0, self.last_used + self.cooldown - combat_time)
+		return self.next_use - combat_time
 
 	def on_cooldown(self, combat_time):
-		if (self.last_used == 0 or combat_time >= self.last_used + self.cooldown):
+		if (combat_time >= self.next_use or self.next_use == 0):
 			return False
 		else:
 			return True
@@ -39,7 +40,8 @@ class CooldownClass:
 		if (not self.on_cooldown(combat_time)):
 			# print(combat_time, self.name, " being used", self.duration)
 			self.active = True
-			self.last_used = combat_time
+			self.next_use = combat_time + self.cooldown
+			self.expire = combat_time + self.duration
 			self._apply(combat_time, Player, Target)
 			Player.calculate_stats()
 			return

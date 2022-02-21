@@ -11,7 +11,6 @@ class Item:
 			self.stats[key] = stats[key]
 		if (slot == "mainhand" or slot == "offhand"):
 			self.stats['is_weapon'] = True
-			self.last_hit = -10
 
 		self.apply_gems()
 

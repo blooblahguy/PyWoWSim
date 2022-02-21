@@ -1,3 +1,4 @@
+# import numpy as np
 import random
 
 class HitTableClass():
@@ -16,7 +17,6 @@ class HitTableClass():
 		self.miss = 28
 		crit_mult = 1 + (2 * (1 + self.Player.stats['crit_mult']) - 1)
 		self.modifier = [(100 - self.glance_dr) / 100, crit_mult]
-		# print("white", crit_mult)
 
 		return self._calc_hit(damage, False)
 		
@@ -25,7 +25,6 @@ class HitTableClass():
 		self.miss = 9
 		crit_mult = 1 + (2 * (1 + self.Player.stats['crit_mult']) - 1) * (1 + 0.1 * self.Player.talents["impale"])
 		self.modifier = [0, crit_mult]
-		# print("sepcial", crit_mult)
 
 		return self._calc_hit(damage, True)
 
@@ -36,12 +35,11 @@ class HitTableClass():
 
 		damage *= self.Player.stats['damage_mult']
 
-		# print(self.miss, self.Player.stats['hit_chance'])
-		self.miss = max(self.miss - self.Player.stats['hit_chance'], 0.0)
-		self.dodge = 6.5 - min(self.Player.stats['expertise'], 6.5)
+		self.miss = self.miss - self.Player.stats['hit_chance']
+		self.dodge = 6.5 - self.Player.stats['expertise']
 		self.crit = self.Player.stats['crit_chance']
 
-		roll = random.randrange(0, 100)
+		roll = random.randint(0, 100)
 		calc_miss = self.miss
 		calc_dodge = self.miss + self.dodge
 		calc_glance = self.miss + self.dodge + self.glance
@@ -58,21 +56,15 @@ class HitTableClass():
 		# reduce from armor now
 		reduce = 1 - (self.Target.armor / (self.Target.armor - 22167.5 + 467.5 * 70))
 		damage *= reduce
-		# print(reduce)
 
 		# roll
 		if (roll < calc_miss):
-			# print(0.0, "miss")
 			return 0.0, "miss"
 		if (roll < calc_dodge):
-			# print(0.0, "dodge")
 			return 0.0, "dodge"
 		if (roll < calc_glance):
-			# print(damage, self.modifier[0], "glance")
 			return damage * self.modifier[0], "glance"
 		if (roll < calc_crit):
-			# print(damage, self.modifier[1], "crit")
 			return damage * self.modifier[1], "crit"
 
-		# print(damage, "hit")
 		return damage, "hit"

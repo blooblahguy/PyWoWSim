@@ -1,49 +1,25 @@
-from msilib.schema import Class
-import multiprocessing
+from multiprocessing import Process, Manager
+import threading
+import time
 
-class Classtest():
-	def __init__(self):
-		self.name = "class"
-
-
-# def test(threadnum, globalarray):
-# 	print("hello world")
-# 	# classtest = Classtest()
-# 	globalarray.append("test")
-
-# if __name__ == '__main__':
-# 	globalarray = []
-# 	threads = []
-# 	for i in range(5):
-# 		t = Process(target = test, args = (i, globalarray))
-# 		threads.append(t)
-# 		t.start()
-
-# 	# await all before continueing
-# 	for thread in threads:
-# 		thread.join()
-
-# 	print(globalarray)
-
-Sims = {}
-
-def combat_loop(name, queue):
-	Sims = queue.get()
+def f(name, Sims):
 	Sims[name] = True
 
-	queue.put(Sims)
-
 if __name__ == '__main__':
-	queue = multiprocessing.Queue()
-	queue.put(Sims)
-	threads = []
-	for i in range(5):
-		name = "thread " + str(i)
-		t = multiprocessing.Process(target = combat_loop, args=(name, queue))
-		threads.append(t)
-		t.start()
+	
+	with Manager() as manager:
+		Sims = manager.dict()
 
-	for thread in threads:
-		t.join()
+		sim_start = time.time()
+		processes = []
+		for i in range(500):
+			name = "thread "+str(i)
+			p = Process(target=f, args=(name, Sims))
+			processes.append(p)
+			p.start()
 
-	print(queue.get())
+		for p in processes:
+			p.join()
+
+		print("Sim:", "--- %s seconds ---" % round(time.time() - sim_start, 3))
+		# print(Sims)
