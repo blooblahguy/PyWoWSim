@@ -3,7 +3,7 @@
 settings = {}
 settings['combat_seconds'] = 180 #165
 settings['per_second'] = 0.1
-settings['iterations'] = 100
+settings['iterations'] = 1000
 settings['execute_range'] = 20
 settings['latency'] = 0
 

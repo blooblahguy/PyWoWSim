@@ -10,9 +10,9 @@ log = {}
 # 	"dodge": False,
 # }
 
-def log_combat(*args):
-	# print(args)
-	pass
+# def log_combat(*args):
+# 	# print(args)
+# 	pass
 
 # def log_damage(name, damage, hitType):
 # 	data = damage_format.copy()

@@ -194,6 +194,8 @@ def combat_loop(name = "test", TotalSims = {}):
 	totals['overcapped_rage'] = Sim.overcapped_rage
 	TotalSims[name] = totals
 
+variable = "true"
+
 # profiler = Profiler()
 # profiler.start()
 
